@@ -1,0 +1,798 @@
+\textbf{Seraphis: A Privacy-Preserving Transaction Protocol Abstraction}\\
+koe\footnote{Author `koe' worked on this document partly as an employee of MobileCoin, Inc.}\footnote{This is just a draft, so it may not always be available wherever it is currently hosted.} \texttt{ukoe@protonmail.com}\\
+\today\\
+Draft v0.0.1
+
+\textbf{License}: Seraphis is released into the public domain.
+
+\section{Abstract}
+\label{sec:abstract}
+
+Seraphis\footnote{The name `Seraphis' is based on Serapis, a Graeco-Egyptian syncretistic deity. Syncretism is the combination/reconciliation of different ideas/ways of thinking, similar to how Seraphis is a protocol that brings together many ideas and permits a variety of proving systems.} is a privacy-focused transaction protocol abstraction for p2p electronic cash systems that use the transaction output model (the {\em e-note} model in this paper). Seraphis e-notes are amount-transfer devices in the RingCT tradition, which record an `amount' as a Pedersen commitment, and an `address with transfer-authority' as a specially-designed prime-order group point (similar to CryptoNote one-time addresses). Unlike previous protocols compatible with CT (Confidential Transactions), where e-note membership, ownership, and unspentness proofs were highly integrated into one large proving structure (such as MLSAG or CLSAG in the case of standard RingCT), Seraphis separates membership proofs from ownership and unspentness proofs. This allows the security model for membership proofs to be abstracted away from any specific proving system, which both allows relatively simpler proving structures to be used, and greatly simplifies the overall security model of Seraphis compared to its predecessors. Doing so also allows a linking tag (a.k.a.\ key image) construction with a number of favorable properties. Most notably, implementers of Seraphis can use an addressing scheme which permits wallets with three tiers of permissions (view received amounts, full balance recovery, full balance recovery with spend authority). The second permission tier is unique to Seraphis among protocols in the CryptoNote tradition.
+
+
+
+\section{Introduction}
+\label{sec:introduction}
+
+Seraphis is a transaction protocol abstraction for p2p electronic cash systems. What is a `p2p electronic cash system' and why does it need a `transaction protocol'?
+
+A p2p (peer-to-peer) electronic cash system is a monetary system where the entire supply of currency is stored/recorded in digital form, and transactions (attempts to transfer money to new owners) are mediated by a network of {\em peers} (usually called {\em nodes}). Such systems are typically designed so no participant in the system has the power to easily censor transactions, re-spend funds that have been spent before, or increase the total money supply at will.
+
+To achieve those design goals, it is necessary for such systems to be decentralized. The peers who mediate transactions (checking their validity with respect to the existing state of the money supply, and deciding which of N conflicting transactions to accept) do not necessarily trust each other. It is therefore beneficial to have a common rule-set and format for constructing transactions, so that any peer can validate any transaction and reach consensus with other peers/nodes about mutations of the monetary state. The transaction rule-set and format used by any given p2p electronic cash system is called its {\em transaction protocol}.
+
+Seraphis is a transaction protocol {\em abstraction}, which means it defines the rule-set that a transaction protocol must satisfy (and the corresponding security model) without specifying any concrete proving systems.
+
+
+\subsection{Monetary state}
+\label{subsec:intro-monetary-state}
+
+Most modern p2p electronic cash systems are so-called `cryptocurrencies' in the tradition of Bitcoin~\cite{Nakamoto_bitcoin}. In Bitcoin, each (archival) node maintains a full copy (called a {\em ledger}) of all mutations to the monetary state that led from Bitcoin's inception up to the current moment.
+
+The monetary state of a cryptocurrency is defined by all the `money creation' and `amount transfer' events that have occurred since the currency was created. Almost universally, those events are defined in the {\em transaction output} model (henceforth called the {\em e-note} model). An e-note is a small message that records an `amount of money', an `ownership address' that gives the recipient the authority to spend the e-note, and an optional arbitrary memo.
+
+\begin{itemize}
+    \item \textbf{Money creation event}: Create a new `coinbase e-note', which increases the total supply of money (see Section \ref{subsec:implementers-coinbase-enotes}).
+    \item \textbf{Money transfer event (transaction)}: Consume one or more previously unspent e-notes to transfer the amounts they record to one or more new e-notes (see Section \ref{sec:seraphis}).
+\end{itemize}
+
+The `current monetary state' of a cryptocurrency is therefore the set of unspent e-notes recorded in the ledger.
+
+
+\subsection{Transaction protocols}
+\label{subsec:intro-transaction protocols}
+
+Transaction protocols must always codify a basic set of rules.
+
+\begin{itemize}
+    \item \textbf{Membership}: E-notes spent by a transaction must already exist in the ledger.
+    \item \textbf{Unspentness}: E-notes spent by a transaction must not have been already spent.
+    \item \textbf{Ownership}: The transaction author must have the authority to spend those e-notes.
+    \item \textbf{Amount balance}: The total amount recorded in e-notes spent by a transaction must equal the total amount in new e-notes created (plus a transaction fee, usually).
+\end{itemize}
+
+A very simple transaction protocol could implement those rules like this:
+
+\begin{itemize}
+    \item \textbf{Membership}: Reference existing e-notes with their indices in the ledger. Transaction validators can look up those e-notes directly.
+    \item \textbf{Unspentness}: When an e-note is spent by a transaction, set a bit flag next to that e-note in the ledger. Reject transactions that reference spent e-notes.
+    \item \textbf{Ownership}: Define ownership with public key cryptography. Let each e-note's address record a public key specified in advance by the intended recipient. To spend an e-note, its owner must create a cryptographic signature with its public key and add the signature to their transaction.
+    \item \textbf{Amount balance}: Record e-note amounts in clear text and use simple sums to check that input amounts equal output amounts (disallowing integer overflow).
+\end{itemize}
+
+An unfortunate consequence of cryptocurrencies being decentralized is that the ledger is `public'. This means all e-notes and transaction events are public knowledge. If amounts are in cleartext, addresses can be reused, and e-notes to be spent are referenced directly, then observers can discern many details about users' finances.
+
+A lack of privacy in the design of a transaction protocol has two main drawbacks, which lead to a competitive disadvantage versus protocols that include elements of privacy (all else being equal).
+
+\begin{enumerate}
+    \item Privacy is valuable to real people. Typically, it is preferable to choose when others obtain information about you than for that information to be available automatically.
+    \item Fungibility and privacy go hand-in-hand. If observers have detailed information about the ledger, then it is possible for some e-notes to be more valuable than other e-notes just based on differences in who owns them or where they originated (i.e.\ the history/transaction-graph that led to those e-notes being created), even if the amounts they contain are the same.
+\end{enumerate}
+
+We believe an ideal transaction protocol should satisfy the following informal privacy matrix.
+
+\begin{itemize}
+    \item \textbf{Recipients}
+    \begin{itemize}
+        \item \textbf{Know}: Amounts received, and when they were received.
+        \item \textbf{Don't know}: Who sent them any given amount.
+    \end{itemize}
+    \item \textbf{Senders}
+    \begin{itemize}
+        \item \textbf{Know}: Amounts sent, when they were sent, and who they were sent to.\footnote{A transaction author inherently knows who they send e-notes to. This information does not need to be stored in the ledger to satisfy this privacy matrix.}
+        \item \textbf{Don't know}: If an amount sent to someone else has been spent.
+    \end{itemize}
+    \item \textbf{Observers}
+    \begin{itemize}
+        \item \textbf{Know}: The number of inputs/outputs in each transaction, fees paid by each transaction, and when each transaction was added to the ledger.
+        \item \textbf{Don't know}: The amounts involved in any transaction (except fees), the relationships between any transactions, or the amounts owned by any user.
+    \end{itemize}
+\end{itemize}
+
+Most of these requirements are (relatively easily) met by CryptoNote-style addressing and linking tags (a.k.a.\ key images) \cite{cryptoNoteWhitePaper} and Confidential Transactions \cite{maxwell-ct-2}, which were first combined in the protocol RingCT \cite{MRL-0005-ringct}. There are two areas of weakness in existing protocols based off RingCT.
+
+\begin{itemize}
+    \item Observers can, to some extent, discern when a transaction was constructed, which is stronger information than simply `when a transaction was added to the ledger'. The biggest culprit for this lies in transaction fees, which are often a function of real-world time. The problem of transaction timing is out-of-scope for this paper.
+    \item Observers can, to some extent, discern relationships between transactions. Membership proofs defined in RingCT (and those used in related protocols like Triptych \cite{triptych-preprint}, Lelantus \cite{lelantus-preprint} [[[change citation?]]], Omniring \cite{omniring-paper}, and RingCT3.0 \cite{ringct3-preprint}) have `anonymity sets'. A transaction author proves that each e-note spent by their transaction exists in a small set of e-notes, and further proves that that small set is a subset of e-notes that exist in the ledger. With this method, observers know there is more likely to be a relationship between two transactions if one of them references an e-note created by the other, than if no such connection exists. This probabilistic knowledge is stronger than the `pure/ideal' case where membership proofs show an e-note being spent exists in the ledger without giving any hints about which one it might be.
+\end{itemize}
+
+Increasing the anonymity set size of membership proofs naturally reduces how much information observers can glean from transactions. However, combining membership proofs with ownership and unspentness proofs in one large proving structure, a ubiquitous pattern in previous RingCT-inspired protocols, has led to some challenges around increasing that size.
+
+Most importantly, proving structures suitable for both membership proofs and ownership/unspentness proofs place constraints on the construction of linking tags, which are `images' of e-note addresses produced when the e-notes are spent. Linking tags are the core element of unspentness proofs in privacy-focused transaction protocols. If a transaction's input proofs contain a linking tag that already exists in the ledger, then the transaction is trying to re-spend an e-note that has already been spent.
+
+As one example, the transaction protocol Triptych \cite{triptych-preprint}, which allows a proving structure one or two orders of magnitude more efficient than those allowed by standard RingCT, features a linking tag construction that looks like $\tilde{K} = (1/k^o)*U$. Here $k^o$ is the private key of the address that owns a given e-note, and $U$ is a generator of a prime-order cyclic group. By inverting $k^o$ to create linking tags, it becomes relatively more difficult to design a multisignature scheme where multiple individuals collaborate to sign transactions, compared to a construction that is linear in $k^o$. This is because a linear construction would allow a simple sum of components provided by signature participants.
+
+
+\subsection{Our contribution}
+\label{subsec:intro-our-contribution}
+
+The main innovation of Seraphis compared to its predecessors is separating ownership and unspentness proofs from membership proofs. Seraphis membership proofs only say (more-or-less) that a commitment to an e-note corresponds with an e-note in some reference set. The prover then operates on the e-note commitment to demonstrate ownership and unspentness and to connect it with the proof that amounts balance.
+
+This separation allows the definition of linking tags to be fairly open-ended. We designed a linking tag construction with the following (informal) properties.
+
+\begin{enumerate}
+    \item Linking tags are created by inverting `some' of the private key material associated with an e-note's address.
+
+    If, in a multisignature scheme, all private key material related to linking tags are known by all signing participants in advance, then it is not a concern if that material is inverted to create linking tags.
+
+    Proving knowledge of the address's `other' private key material (as part of an ownership proof; see Section \ref{subsec:seraphis-ownership-unspentness-proofs}) is trivially linear, so if that material is divided amongst multisig participants, then simple multisignature schemes are possible.
+
+    \item Linking tags make it possible to implement a user addressing scheme with three tiers of permissions (see Sections \ref{subsec:seraphis-address-model} and \ref{subsec:implementers-addressing-schemes}).
+
+    In that scheme, users can isolate parts of their personal private key material to create wallets that can view received e-notes only, recover the user's full balance (i.e.\ recompute linking tags to detect spent e-notes), or both recover the user's full balance and also spend owned e-notes. The second permission tier is uniquely enabled by Seraphis among protocols in the CryptoNote tradition.
+\end{enumerate}
+
+In Appendix \ref{appendix:squashed-e-note-model-model} we introduce a more-restrictive membership proof model layered on the primary model in this paper. We call it the `squashed e-note' model. Concrete proving structures in that model are non-trivially more efficient than structures in the plain model, allowing relatively larger anonymity set sizes as a function of proof complexity and size compared to structures in the plain model, when comparing structures based on the same proving systems.
+
+Also note that Seraphis permits `transaction chaining', where it is possible to construct a transaction B that spends an e-note from transaction A before A has been added to the ledger (Section~\ref{subsec:implementers-other-recommendations}), and `membership proof delegation', where constructing a membership proof is delegated to a third party without revealing any wallet private keys. Combining these yields `transaction chaining by delegation', where the author of transaction B authorizes the transfer of funds from an e-note that doesn't exist in the chain, then gives their partial transaction (without a membership proof) to the author of transaction A (which creates that e-note), who can complete transaction B and submit it after they have completed and submitted transaction A.\footnote{Transaction chaining by delegation gets even more interesting if combined with something like Monero's lock-time. A Monero transaction author can define the earliest blockchain height where the new e-notes they create can be spent. Suppose transaction B spends an e-note that doesn't exist in the ledger (blockchain) {\em and} an e-note with a certain lock-time, then author B delegates completing the transaction to author A. Author A cannot submit transaction B until that locked e-note can be spent. If they submit transaction A right away, then there will be a period of time where the e-note it creates can't be spent by transaction B. Author B could make another transaction B' in that time that spends the e-note. We leave the application of these ideas to a useful protocol as an exercise for the reader.}
+
+
+
+\section{Preliminaries}
+\label{sec:preliminaries}
+
+\subsection{Public parameters}
+\label{subsec:preliminaries-public-parameters}
+
+[[[PLAGIARIZED FROM TRIPTYCH PAPER]]] Let $\mathbb{G}$ be a cyclic group of prime order $l > 3$ in which the discrete logarithm problem is hard, and let $\mathbb{F}_l$ be its scalar field. Let $\mathcal{H}: \{0,1\}^* \to \mathbb{F}_l$ be a cryptographic hash function. We add a subscript to $\mathcal{H}$, such as $\mathcal{H}_1$, in lieu of domain-separating the hash function explicitly; any domain-separation method may be used in practice (e.g.\ an ASCII string corresponding to a domain-separated use case, such as $\mathcal{H}(``sender\_receiver\_secret",[\textrm{hash input}])$). Let $G$, $H$, and $U$ be generators of $\mathbb{G}$ whose discrete logarithm relationship to each other is unknown. Note that all such generators may be produced using public randomness. For example, the use of a hash function with domain separation may be appropriate. All such public parameters are assumed to comprise a global reference string known to all players. For readability, we generally exclude explicit reference to public parameters in algorithm definitions and Fiat-Shamir transcript hashes.
+
+
+\subsection{Notation}
+\label{subsec:preliminaries-notation}
+
+no exponents, only superscripts
+
+Pedersen commitments? vG + aH
+
+non-pedersen commitments? vG + P
+
+range proof? for pedersen commitment, demonstrate composition (DL known on G and H), a /in [0, 2\^64 - 1]
+
+
+
+\section{Seraphis}
+\label{sec:seraphis}
+
+In this section we discuss the various components of Seraphis, with security theorems and proofs introduced where appropriate.
+
+
+\subsection{Transaction overview}
+\label{subsec:seraphis-transaction-overview}
+
+For context, we outline the content of a transaction here.
+
+\begin{itemize}
+    \item \textbf{Inputs}: The transaction spends old e-notes.
+    \begin{itemize}
+        \item \textbf{E-note-images}: Representations of the e-notes spent by this transaction, including their linking tags (Section \ref{subsec:seraphis-e-note-images}).
+        \item \textbf{Membership proofs}: Proof structures demonstrating that each e-note-image corresponds with a real e-note in the ledger (Section \ref{subsec:seraphis-membership proofs}).
+        \item \textbf{Ownership and unspentness proofs}: Proof structures that use e-note-images to demonstrate ownership and unspentness for each spent e-note (Section \ref{subsec:seraphis-ownership-unspentness-proofs}).
+    \end{itemize}
+    \item \textbf{Outputs}: The transaction creates new e-notes.
+    \begin{itemize}
+        \item \textbf{E-notes}: New e-notes (Section \ref{subsec:seraphis-e-notes}). The total amount they contain equals the total amount in spent e-notes (Section \ref{subsec:seraphis-confidential-transactions}).
+        \item \textbf{Range proofs}: Proof structures demonstrating that amount commitments in new e-notes are legitimate (part of the Confidential Transactions technique) (Section \ref{subsec:seraphis-confidential-transactions}).
+    \end{itemize}
+    \item \textbf{Miscellaneous}: Miscellaneous other data included with a transaction, such as a transaction fee (Section \ref{sec:considerations-implementers}).
+\end{itemize}
+
+
+\subsection{E-notes}
+\label{subsec:seraphis-e-notes}
+
+Seraphis e-notes are composed of an amount commitment, an address, and a memo.
+
+\begin{itemize}
+    \item \textbf{Amount commitment}: A Pedersen commitment $C$ (with blinding factor $x$) to the amount $a$ possessed by the e-note.
+    \[C = x G + a H\]
+
+    \item \textbf{Address}: A public key $K^o$ composed of two generators $U$ and $G$, and two corresponding private keys $k^o_a$ and $k^o_b$. The e-note's owner must prove knowledge of those private keys if they want to transfer the amount $a$ to new e-notes.\vspace{.115cm}
+    \[K^o = k^o_a*U + k^o_b*G\]
+
+    \item \textbf{Memo}: An arbitrary memo field. This usually includes information that helps the e-note's owner identify that they own it, learn the private keys $k^o_a$ and $k^o_b$, and reconstruct the amount commitment. See Section \ref{subsec:implementers-information-recovery}.
+\end{itemize}
+
+
+\subsection{E-note-images}
+\label{subsec:seraphis-e-note-images}
+
+An e-note-image is a representation of an e-note.
+
+\begin{itemize}
+    \item \textbf{Masked commitment}: The e-note's commitment with an additional masking factor.\vspace{.115cm}
+    \begin{align*}
+        C' &= t_c G + C \\
+        C' &= (t_c + x)*G + a H \\
+        C' &= v_c G + a H
+    \end{align*}
+
+    \item \textbf{Masked address}: The e-note's address with a masking factor.\vspace{.115cm}
+    \begin{align*}
+        K'^o &= t_k G + K^o \\
+        K'^o &= (t_k + k^o_b)*G + k^o_a*U \\
+        K'^o &= v_k G + k^o_a*U
+    \end{align*}
+
+    \item \textbf{Linking tag}: The e-note's linking tag.\vspace{.115cm}
+    \[\tilde{K} = (1/k^o_a)*G\]
+\end{itemize}
+
+The blinding factors $t_c$ and $t_k$ must be statistically independent and selected at random from a uniform distribution. [[[formalize better?]]]
+
+Note that observers cannot look at an e-note-image and discern what e-note it was created from.
+
+We prove that e-note-image addresses and commitments are constructed properly from real e-notes in Section \ref{subsec:seraphis-membership proofs}, then further prove that linking tags are constructed properly from e-note-image masked addresses in Section \ref{subsec:seraphis-ownership-unspentness-proofs}.
+
+\subsubsection{Sender-receiver anonymity}
+\label{subsubsec:e-note-images-sender-receiver-anonymity}
+
+If a person spends an e-note, they should expect that the person who originally sent them that e-note will not know it is spent.
+
+If $t_c$ and $t_k$ are randomly selected and unknown to the original sender, then the sender cannot detect the original e-note by inspecting the e-note-image's commitment and address.
+
+We further argue in Sections \ref{subsec:seraphis-membership proofs}, \ref{subsec:seraphis-ownership-unspentness-proofs}, and \ref{subsec:seraphis-address-model} that input proofs and linking tags will not break sender-receiver anonymity.
+
+\subsubsection{Linking tags}
+\label{subsubsec:e-note-images-linking-tags}
+
+Linking tags are uniquely defined by the private key $k^o_a$. This means for a user to create two distinct linking tags from the same address, they must be able to solve the DLP between generators $U$ and $G$, which we assume to be a hard problem [[[elaborate this proof?]]].
+
+Since linking tags are assumed to be unique for each unique address $K^o$, they can be used to prove unspentness. If a transaction has an e-note-image with a linking tag that has appeared in the ledger, then that transaction is invalid.
+
+Note that if two e-notes have the same address $K^o$, then only {\em one} of them can be spent, hence the superscript $o$. Going along with the CryptoNote tradition, $K^o$ can be referred to as a {\em one-time address}. The construction of one-time addresses is discussed in Sections \ref{subsec:seraphis-address-model} and \ref{subsec:implementers-information-recovery}.
+
+
+\subsection{Membership proofs}
+\label{subsec:seraphis-membership proofs}
+
+Every input to a transaction must have a membership proof. The proof must demonstrate that the input's e-note-image was built from an e-note that exists in the ledger.
+
+A proving system/structure is only eligible to be used as a Seraphis membership proof if it can satisfy the following abstract model. [[[formalize better?]]]
+
+\begin{enumerate}
+    \item Let $G_1,...,G_n$ and $H_1,...,H_n$ be generators whose discrete logarithm relations with each other and with $G$ are unknown.
+
+    \item Let $\mathbb{S}$ represent a set of tuples $\{K_i, C_i\}$, where\vspace{.115cm}
+    \begin{align*}
+        K_i &= z_i G + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n \\
+        C_i &= x_i G + a_{i,1} H_1 + a_{i,2} G_2 + ... + a_{i,n} H_n
+    \end{align*}
+
+    \item Let $\tilde{S}$ represent a tuple $\{K', C'\}$, where\vspace{.115cm}
+    \begin{align*}
+        K' &= z' G + s'_1 G_1 + s'_2 G_2 + ... + s'_n G_n \\
+        C' &= x' G + a'_1 H_1 + a'_2 H_2 + ... + a'_n H_n
+    \end{align*}
+
+    \item The proving system must be able to demonstrate that, within a security parameter $k$, $\tilde{S}$ corresponds to some $S_{\pi} \in \mathbb{S}$, where $\pi$ is unknown to the verifier, such that:
+    \begin{enumerate}
+        \item $s'_j == s_{\pi,j}$ for $j \in 1,...,n$
+        \item $a'_j == a_{\pi,j}$ for $j \in 1,...,n$
+        \item If the prover later demonstrates knowledge of $z'$ in $K'$, then they must also have knowledge of $z_{\pi}$.
+    \end{enumerate}
+    
+    \item The proving system should be considered unusable if, given a proof $\sigma$ from that system that $\tilde{S}$ corresponds to some $S_{\pi}$ in the set $\mathbb{S}$, an observer can guess the index $\pi$ with probability {\tt > 1/size(}$\mathbb{S}'${\tt )}$+ \epsilon(k)$, where $\mathbb{S}' = \mathbb{S}$\textbackslash$\mathbb{S}_O$ and $S_{\pi} \in \mathbb{S}'$, $\mathbb{S}_O$ are tuples the observer knows can't have been subjects of the proof (in the context of Seraphis, if tuples $S$ represent e-notes, then for example he owns the e-notes in $\mathbb{S}_O$), and the observer has no special knowledge about the elements in $\mathbb{S}'$ (however, he can know $z_i G$, $x_i$, and $a_{i,j}$ for all $S_i \in \mathbb{S}'$).\footnote{In practice, $\pi$ can often be guessed with probability at least marginally above {\tt 1/size(}$\mathbb{S}'${\tt )}. This is because the circumstances around when e-notes are recorded in the ledger are often observable. Things like timing information, patterns of behavior, IP addresses of transaction submitters, transaction fees, etc., can all form the basis of heuristics for analyzing the true member referenced by a membership proof.}
+\end{enumerate}
+
+In the context of Seraphis, we straightforwardly construct tuples $S$ directly from e-notes, and tuples $\tilde{S}$ from e-note-images. Readers will note that a membership proof says nothing about how $K$ and $C$ are constructed (i.e.\ the values of $G_1,...$, $H_1,...$, etc.). In future sections we will add more constraints to guarantee that e-notes and e-note-images found in transactions have the expected forms (within a security parameter).
+
+A trivial proof that satisfies the above model would be a pair of signatures on commitments to zero $K' - K$ and $C' - C$, given a reference set $\mathbb{S}$ that contains only one tuple $\{K, C\}$. More interesting solutions include a CSAG (a CLSAG \cite{clsag-eprint} without linking) on a ring of such commitment to zero pairs, a Groth/Bootle \cite{...} one-of-many proof (see Appendix \ref{appendix:xxx}) on a collection of those pairs, or a Groth/Bootle one-of-many proof applied to the squashed e-note model (see Appendix \ref{appendix:squashed-e-note-model}).
+
+
+\subsection{Ownership and unspentness proofs}
+\label{subsec:seraphis-ownership-unspentness-proofs}
+
+Alongside each membership proof must be an ownership and unspentness proof. In Seraphis, these must be done simultaneously to ensure the linking tag (which forms the basis of unspentness) is derived from the relevant e-note address.
+
+A proof structure is only eligible to be used for Seraphis ownership/unspentness proofs if it can accomplish the following.
+
+\begin{enumerate}
+    \item Assume there is a group point $K = x G + y U$. Let\vspace{.115cm}
+    \begin{align*}
+        \tilde{K} &= (1/y)*G \\
+        K_{t1} &= (1/y)*K \\
+        K_{t2} &= K_{t1} - U
+    \end{align*}
+
+    \item Demonstrate the simultaneous discrete log of $K_{t1}$ and $\tilde{K}$ with respect to $K$ and $G$. A simultaneous discrete log proof shows knowledge of a single scalar that is the discrete log between two pairs of group elements (in this case $(1/y)$). [[[formalize better?]]]
+
+    \item Demonstrate the discrete log of $K_{t2} = (x/y)*G$ with respect to $G$.
+\end{enumerate}
+
+This `composition' proof system shows that:
+
+\begin{itemize}
+    \item The prover knows values $x$ and $y$ such that $K = x G + y U$.
+
+    \item $\tilde{K} == (1/y)*G$
+\end{itemize}
+
+We can apply this `composition' proof to Seraphis in the following way.
+
+Suppose a membership proof $\sigma_{mp}$ shows that $\tilde{S}$ corresponds to some $S_{\pi}$ in the set $\mathbb{S}$. Then suppose the key $K' = z' G + s'_1 G_1$ from $\tilde{S}$ is passed as input to the above proof system, and a valid proof is created. Observe the following.
+
+\begin{itemize}
+    \item For the composition proof to succeed, $G_1 == U$ must be true, and all $s'_x == 0$ for $x > 1$.
+
+    \item The key $K_{\pi}$ from $S_{\pi}$ must contain the generators $G$ and $U$ like so: $K_{\pi} = z_{\pi} G + s_{\pi, 1} U$.
+
+    \item Since the composition proof shows that the prover knows $z'$, according to the membership proof model they must also know $z_{\pi}$.
+
+    \item We know $s_{\pi, 1} == s'_1$, which means $\tilde{K} = (1/ s_{\pi, 1})*G$.
+
+    \item The verifier will not be able to discern which $S_i$ in the set $\mathbb{S}$ corresponds with $K'$.
+\end{itemize}
+
+Now suppose a transaction spends an e-note. Let them transform it into $S_{\pi}$, give it a membership proof $\sigma_{mp}$, and give the resulting image $S'$ a composition proof. With this proof pair, the verifier can be confident the transaction author owns an e-note in the set $\mathbb{S}$ (i.e.\ they know the keys $s_{\pi,1} = k^o_a$ and $z_{\pi} = k^o_b$ for some unknown index $\pi$), and that the linking tag $\tilde{K} = (1/k^o_a)*G$ is valid and can be used to check if the e-note at index $\pi$ is unspent.
+
+The transaction's e-note-image structure records $\tilde{S} = \{K', C'\}$ and $\tilde{K}$ for observers/verifiers to reference.
+
+
+\subsection{Confidential Transactions}
+\label{subsec:seraphis-confidential-transactions}
+
+Confidential Transactions (CT) \cite{maxwell-ct-2} is a technique for hiding the amounts involved in a transaction from observers using Pedersen commitments (which are perfectly hiding). Even though amounts are hidden, we can still demonstrate that amounts balance in a transaction by using the homomorphic property of Pedersen commitments.
+
+Note that, thanks to our membership proof model (Section \ref{subsec:seraphis-membership proofs}), the commitment $C'$ in an e-note-image will contain the same values $a_{\pi,1},...,a_{\pi,n}$ as the commitment $C$ in the e-note being spent. In Section \ref{subsubsec:confidential-transactions-range-proofs} we will prove that e-note commitments have the form $C = x G + a H$ as expected (i.e.\ prove that $H_1 == H$ and $a_{\pi,x} == 0$ for $x > 1$), and hence the amount $a$ in $C' = v_c G + a H$ equals the amount in the original commitment.
+
+We want to show that the sum of e-note-image commitments (inputs) equals the sum of new e-note commitments (outputs). To do that, the sums of blinding factors must match. Perform the following steps before constructing any membership proofs for a transaction.
+
+\begin{enumerate}
+    \item Let a transaction spend $j \in 1,...,m$ old e-notes and create $t \in 1,...,p$ new ones. Let the masked commitments in e-note-images be denoted $C'_j = v_{c,j} G + a_j H$. Let the commitments in new e-notes be denoted $C_t = y_t G + b_t H$.
+
+    \item For $j \in 1,...,m-1$, randomly select $v_{c,j} \in_R \mathbb{F}_l$. For $t \in 1,...,p$, randomly select $y_t \in_R \mathbb{F}_l$.
+
+    \item Define $v_{c,m} = [\sum^{p}_{t=1} y_t] - [\sum^{m-1}_{j=1} v_{c,j}]$.
+\end{enumerate}
+
+If the following equality holds for the transaction, then, within a security factor, there must be a balance on both generators ($G$ and $H$) in the commitments.\vspace{.115cm}
+\[\sum C'_j == \sum C_t\]
+
+In conclusion, the amounts must balance between input and output e-notes.
+
+\textbf{Note}: The values $t_{c,j} = v_{c,j} - x_j$ (recall Section \ref{subsec:seraphis-e-note-images}) will be uniformly distributed because $v_{c,j}$ are uniformly distributed.
+
+\subsubsection{Range proofs}
+\label{subsubsec:confidential-transactions-range-proofs}
+
+Since Pedersen commitments are elements of a cyclic group, it is conceivable that the amounts represented by individual elements are larger than the amount represented by a sum of those elements.\footnote{For example, in a cyclic group of order 11, $7 + 7 \mod 11 \equiv 3$. If the input amount is 3, then the output amount is 14!} To prevent this problem, transaction authors must provide a `range proof' for each new e-note's commitment.
+
+A range proof must demonstrate the following for a given commitment $C = x G + a H$.\footnote{At this time, Bulletproofs+ by Chung et.\ al \cite{bulletproofs_plus} (based on Bulletproofs by B\"{u}nz et.\ al \cite{Bulletproofs_paper}) is thought to be the most efficient proving structure for range proofs, without a trusted setup.}[[[formalize this better?]]]
+
+\begin{itemize}
+    \item Prove knowledge of $x$ and $a$ such that $C = x G + a H$.
+
+    \item Show that the value $a$ is in the range $[0, 2^{z} - 1]$.
+\end{itemize}
+
+The maximum number of elements $n$ allowed on one side of a balance check must be $n < l / (2^z - 1)$, otherwise range proofing those elements is pointless. Typically $z = 64$ and $l \approx 2^{252} - 2^{256}$, so $n$ can be as large as $\approx 2^{192}$. However, usually $n << 2^{64}$ for practical reasons.
+
+Only new e-note commitments need range proofs, not e-note-image commitments. If a membership proof only references e-notes from the ledger, and all e-notes in the ledger have a range proof, then it is guaranteed (within a security factor) that e-note-image commitments contain legitimate amounts.
+
+Importantly, range proofing new e-note commitments `locks in' the structure $C = x G + a H$. For any membership proof on e-note commitments that have been range proofed, it must be the case that $H_1 == H$ and $a_{\pi,x} == 0$ for $x > 1$.
+
+\subsubsection{Sender-receiver anonymity}
+\label{subsubsec:confidential-transactions-sender-receiver-anonymity}
+
+If a transaction only has one input ($m = 1$) and all its $y_t$ are known by an observer (e.g.\ all e-notes produced by the transaction were received by that person), then the observer will know the value $v_{c,1} = [\sum^{p}_{t=1} y_t]$.
+
+However, even if the observer is the original sender of the e-note that the transaction author is spending, they won't necessarily know any more information about the transaction's input than if they weren't the original sender.
+
+First note that the observer, by knowing all $y_t$, will presumably also know the total amount output by the transaction (assuming they know the transaction fee, if relevant), and hence will know the input amount $a_1$.
+
+Second, even if they were the original sender, the input could have been sent to the transaction author by someone else. Despite knowing both $x_1$ and $v_{c,1}$, the observer has no way to know if the real input actually had a different blinding factor $x'_1$.
+
+There are two problems to consider.
+\begin{enumerate}
+    \item If the amount $a_1$ is `unusual' (i.e.\ unlikely to have been created by someone else), then the observer can guess with high probability of success that they created the e-note being spent, assuming that e-note was referenced by the input's membership proof. This problem may extend to multi-input transactions if the `low bits' of the total amount are unusual (e.g.\ because one input has a fingerprint recorded in low bits of its amount value, and other inputs' amounts have low bits set to zero).
+
+    Even if the amount isn't unusual, if the anonymity set size of membership proofs is relatively small, then there is a very low probability that the observer's e-note was randomly selected as a decoy and just happened to have the same amount as the real e-note being spent.
+
+    \item If $v_{c,1}$ is used as a secret input to a proof (e.g.\ a discrete log proof of the commitment to zero $C' - C$ with respect to $G$), then the observer may be able to guess and check the proof structure to see if $v_{c,1} = [\sum^{p}_{t=1} y_t]$ is in fact that secret input (depending on the proof structure used).
+\end{enumerate}
+
+Both problems are mitigated or solved by including a `change e-note' in each transaction, even if its amount must be zero.\footnote{There are niche cases where the first problem is unsolvable. For example, the sender could allow a `low bit' fingerprint to propagate from an input to an output. The observer may also be able to infer, by the mere fact an e-note he created was referenced by a membership proof, that his e-note is being spent.} A change e-note is an e-note the transaction author sends to himself if the total output amount of their transaction exceeds the amount they intend to send to other people (unavoidable if no combination of owned e-notes' amounts equals the intended total output amount of their transaction).
+
+
+\subsection{E-note address model}
+\label{subsec:seraphis-address-model}
+
+An e-note is sent from one person (a transaction author) to another (the recipient). To spend an e-note, the recipient must know $k^o_a$ and $k^o_b$ in the address $K^o = k^o_a*U + k^o_b*G$. However, it isn't feasible for the recipient to define both of those values in advance, for example by requesting that the transaction author place a pre-defined public key in the e-note address slot.
+
+The reason for this is only one e-note with a given value $k^o_a$ can ever be spent, since linking tags have the form $KI = (1/k^o_a) G$. One trivial solution would be for recipients to randomly generate a new address $K = k_a U + k_a G$ for each e-note they want to receive. However, that is very inefficient and impractical.
+
+Instead, we recommend the following e-note address model.
+
+\begin{enumerate}
+    \item Let a recipient's address for spending e-notes be the {\em spend key} $K^s$:\vspace{.115cm}
+    \[K^s = k_{a, recipient} U + k_{b, recipient} G\]
+
+    \item An e-note sender generates a random scalar $k_{a, sender} \in_R \mathbb{F}_l$.
+
+    \item The sender defines the e-note's one-time address based on the recipient's spend key:\vspace{.115cm}
+    \begin{align*}
+        K^o &= k_{a, sender} U + K^s \\
+        K^o &= (k_{a, sender} + k_{a, recipient})*U + k_{b, recipient} G
+    \end{align*}
+\end{enumerate}
+
+E-note recipients must learn $k_{a, sender}$ in order to spend their e-notes. We discuss that topic in Section \ref{subsec:implementers-information-recovery}.
+
+\textbf{Comments}
+
+\begin{itemize}
+    \item Transaction authors cannot spend e-notes they created unless they know $\{k_{a, recipient}, k_{b, recipient}\}$. They cannot create linking tags unless they know $k_{a, recipient}$.
+
+    \item Observers will not be able to associate a one-time address $K^o$ with a spend key $K^s$ unless they know the term $k_{a,sender} U$. We assume $k_{a,sender}$ is randomly generated every time an e-note is created, so there will be no `key re-use' patterns that allow observers to derive $K^s$ from $K^o$.
+
+    \item Linking tags will have the form $(1/(k_{a, sender} + k_{a, recipient}))*G$. Even if a transaction author sends many e-notes to the same spend key $K^s$, and all of those e-notes are spent, they cannot use linear algebra on the resulting linking tags to associate those linking tags with the e-notes they created. This avoids the `linearity' problem for fixed-base-point linking tag constructions noted by the CryptoNote whitepaper \cite{cryptoNoteWhitePaper}. [[[formalize better, proof?]]]
+
+    \item In the context of transaction protocols, multisignature schemes allow a group of N participants to `co-own' e-notes (see \cite{MRL-0009-multisig} for example). Only a collaborating subgroup of participants of size M (M $<=$ N) may spend any e-note. This is called `M-of-N multisig'.
+
+    Ideally, multisig schemes allow all participants to view the group's balance (amount of money currently owned). In Seraphis, this means being able to identify all owned e-notes (see Section \ref{subsec:implementers-information-recovery}) and recreate all the corresponding linking tags to check if they have been spent.
+
+    Conveniently, the distinction between $k_{a, recipient}$ and $k_{b, recipient}$ makes our addressing model very `multisig-friendly'. If all multisig participants have full knowledge of $k_{a, recipient}$, then they can easily recompute all linking tags. Meanwhile, $k_{b, recipient}$ can be divided among participants so proving ownership (Section \ref{subsec:seraphis-ownership-unspentness-proofs}) requires a collaborating subgroup of size M.
+
+    Importantly, in Seraphis, proving knowledge of $k_{b, recipient}$ only requires a discrete-log proof between $K_{t2}$ and $G$ from Section \ref{subsec:seraphis-ownership-unspentness-proofs}, where $K_{t2} = (x/y)*G = (t_k + k^o_{b, recipient})/(k^o_{a, sender} + k^o_{a, recipient})*G$. For multisig, this can be achieved with a simple thresholded Schnorr signature (e.g.\ \cite{...}), assuming $t_k$, $k^o_{a, sender}$, and $k^o_{a, recipient}$ are known by all M co-signers.
+\end{itemize}
+
+
+
+\section{Considerations for implementers}
+\label{sec:considerations-implementers}
+
+There are a number of details to consider when implementing Seraphis in a real cryptocurrency. This section is comprised of `recommendations' inspired by historical privacy-focused cryptocurrency implementations.
+
+
+\subsection{Coinbase e-notes}
+\label{subsec:implementers-coinbase-enotes}
+
+For a cryptocurrency to be widely adopted, observers should be able to verify that the total supply of money matches their expectations, based on looking at coinbase e-notes and transactions recorded in the ledger.\footnote{Observers should also expect that coinbase e-notes only appear in the ledger when well-defined rules have been satisfied (e.g.\ they were created in the genesis block, or via PoW/PoS `mining').}
+
+However, Seraphis amounts are hidden using Pedersen commitments. How can transactions spend coinbase e-notes, while allowing coinbase amounts to be visible to observers? There are two approaches.
+
+\begin{enumerate}
+    \item Construct coinbase e-notes the same as normal e-notes. Coinbase e-note authors must publicize the e-note commitments' blinding factors and amounts so observers can verify all coinbase e-note amount commitments are well-made.\footnote{This approach was taken in MobileCoin, where the `origin' account's private keys were publicized \cite{mobilecoin-governance-fees-supply}.}
+
+    \item Let coinbase e-notes have a special format. Instead of recording amount commitments, they should record the amounts in cleartext. If a coinbase e-note is to be referenced in a membership proof's input set $\mathbb{S}$, then it must be `converted' into a normal e-note first.\footnote{This approach was taken in Monero and its various forks \cite{ztm-2}.}
+
+    Converting a coinbase e-note to a normal e-note is very simple.
+    \begin{itemize}
+        \item Set the e-note's address equal to the coinbase e-note's address: $K^o_{e\textrm{-}note} = K^o_{coinbase}$.
+        \item Set the e-note's commitment equal to an unmasked commitment to the coinbase e-note's amount $a$: $C_{e\textrm{-}note} = a H$.
+    \end{itemize}
+
+    When a transaction's membership proof references e-notes in the ledger, it is common to reference them by index. Verifiers look up those indices, then copy the e-notes they find into $\mathbb{S}$. If a verifier finds a coinbase e-note at a lookup index, they will convert it into a normal e-note before copying it into $\mathbb{S}$.\footnote{In practice, transaction verifiers can store converted coinbase e-notes directly in/alongside their local copy of the ledger, so they don't have to be converted each time they are referenced by a transaction.}
+
+    If transaction spends a coinbase e-note, then its corresponding e-note-image's commitment will hide the amount involved even though the original amount had no blinding factor.
+\end{enumerate}
+
+
+\subsection{Transaction fees}
+\label{subsec:implementers-transaction-fees}
+
+Most (or perhaps all) cryptocurrencies have a so-called `transaction fee'. Each transaction must send a small fee to a third-party. Fees disincentivize creating large numbers of transactions, which could cause the ledger to become excessively large. They also allow transaction authors to `prioritize' their transactions. Transactions with high fees will typically be added to the ledger faster than those with low fees if the p2p network is congested.
+
+To ensure fees are publicly verifiable, they are usually recorded in cleartext in transactions. Fee amounts are then converted into e-notes and added to the ledger at a later date. The rules around this conversion process are minutiae defined by each cryptocurrency.\footnote{In PoW cryptocurrencies, each block's miner typically adds the fee amounts from the block's transactions into their coinbase e-note (i.e.\ the output of a so-called `miner transaction') as part of their `block reward' (which usually includes newly minted money).}
+
+Transaction fees must be incorporated into amount balances. Verifiers can use the following simple procedure.
+
+\begin{enumerate}
+    \item Convert the fee amount $f$ into an unmasked commitment: $f H$. Require that $0 \leq f < 2^z$.
+    \item Test that amounts balance:
+    \[\sum_j C' \stackrel{?}{=} \sum_t C + f H\]
+\end{enumerate}
+
+
+\subsection{Non-prime groups}
+\label{subsec:implementers-non-prime-groups}
+
+This paper requires $\mathbb{G}$ to be a prime group, however in practice it may be implemented as a prime subgroup of a non-prime group. One prominent example, used in CryptoNote \cite{cryptoNoteWhitePaper} and its progeny, is the elliptic curve Ed25519 \cite{Bernstein2012-high-speed-high-security-ed25519}, which has order $8*l$ ($l$ is a prime number $\approx 2^{252}$). CryptoNote e-notes and proofs are designed to only use curve points from the subgroup of size $l$.
+
+All uses of curve points in an implementation of Seraphis based on a non-prime group must take into account the possibility that a point recorded in a transaction may not be in the prime subgroup.
+
+In particular, linking tags recorded in e-note-images {\em must} be points in the prime subgroup \cite{key-image-bug}, since checking if a linking tag has appeared in the ledger usually involves a byte-wise lookup. There are several ways to ensure non-prime points are detected by transaction validators. From least to most efficient, they are:
+
+\begin{itemize}
+    \item Test $l*\tilde{K} \stackrel{?}{=} I$, where $I$ is the curve's identity element.
+
+    \item Let the linking tag recorded in e-note-images (and the ledger) be $\tilde{K}_{record} = (1/h)*\tilde{K}$, where $h$ is the curve's cofactor (8 in the case of Ed25519). To validate a transaction, compute $\tilde{K} = h*\tilde{K}_{record}$ before verifying the composition proof from Section \ref{subsec:seraphis-ownership-unspentness-proofs}.
+
+    \item Use an encoding abstraction such as Ristretto \cite{ristretto} to ensure that all points recorded in a transaction (in e-notes, e-note-images, and proof elements) are in the prime subgroup.\footnote{A Ristretto point will fail to decompress into a full elliptic curve point if it is not in the prime subgroup.}
+\end{itemize}
+
+
+\subsection{Information recovery}
+\label{subsec:implementers-information-recovery}
+
+How can e-note owners discover the e-notes they own, read the amounts in those e-notes, reconstruct commitments in order to perform balance proofs, and learn the sender-keys $k_{a,sender}$ so they can construct linking tags?
+
+The answer first pioneered by CryptoNote \cite{cryptoNoteWhitePaper} for privacy-focused transaction protocols revolves around a Diffie-Hellman shared secret between the sender and receiver of an e-note.
+
+\begin{enumerate}
+    \item Let potential recipients define their `public addresses' as tuples $\{K^{DH}, K^{vr}, K^s\}$.
+    \begin{enumerate}
+        \item Diffie-Hellman base key: $K^{DH}$ (for now, let this be an arbitrary key)
+        \item View-received key: $K^{vr} = k^{vr} K^{DH}$
+        \item Spend key: $K^s = k_{a,recipient} U + k_{b,recipient} G$
+    \end{enumerate}
+
+    \item Suppose one or more potential recipients give their public addresses to a transaction author.
+
+    \item The author constructs $p$ e-notes. For e-note $t \in 1,...,p$ he does the following.
+    \begin{enumerate}
+        \item Generate a random `e-note private key' $r_t \in_R \mathbb{F}_l$.
+        \item Compute the e-note public key: $R_t = r_t K^{DH}_t$.
+        \begin{itemize}
+            \item Store $R_t$ in the e-note's memo field.
+        \end{itemize}
+        \item Compute the sender-receiver shared secret: $q_t = \mathcal{H}_1(r_t K^{vr}_t)$.
+        \item Define the one-time address sender key component as a function of $q_t$: $k_{a,sender,t} = \mathcal{H}_2(q_t)$.
+        \item Define the one-time address: $K^o_t = k_{a,sender,t} U + K^s_t$.
+        \begin{itemize}
+            \item Store $K^o_t$ in the e-note's address field.
+        \end{itemize}
+        \item Define the commitment blinding factor as a function of $q_t$: $y_t = \mathcal{H}_3(q_t)$.
+        \item Define the commitment: $C_t = y_t G + b_t H$.
+        \begin{itemize}
+            \item Store $C_t$ in the e-note's amount commitment field.
+        \end{itemize}
+        \item Encrypt/encode the e-note amount $b_t$ using $q_t$: $enc\_amount_t = \textrm{\tt enc}[q_t](b_t)$.
+        \begin{itemize}
+            \item Store $enc\_amount_t$ in the e-note's memo field.
+        \end{itemize}
+    \end{enumerate}
+
+    \item Suppose a potential recipient sees an e-note with index $t$ in a transaction. They want to check if they own it, then uncover as much information as possible.
+    \begin{enumerate}
+        \item Compute the nominal sender-receiver shared secret: $q^{nom}_t = \mathcal{H}_1(k^{vr} R_t)$.
+        \item Compute the nominal spend key: $K^{s,nominal}_t = K^o_t - \mathcal{H}_2(q^{nom}_t)*U$.
+        \begin{itemize}
+            \item If $K^{s,nominal}_t$ matches the spend key in the recipient's address, then they own the e-note.
+        \end{itemize}
+        \item Decode the amount: $b_t = \textrm{\tt dec}[q^{nom}_t](enc\_amount_t)$.
+        \item Compute the commitment blinding factor: $y_t = \mathcal{H}_3(q^{nom}_t)$.
+        \item Verify that the e-note's commitment can be reconstructed: $y_t G + b_t H \stackrel{?}{=} C_t$. If not, then the e-note is malformed and can't be spent.
+    \end{enumerate}
+\end{enumerate}
+
+\textbf{Comments}
+
+\begin{itemize}
+    \item Basing information recovery on a Diffie-Hellman exchange between sender and recipient ensures $k_{a,sender}$, $y_t$, and $enc\_amount_t$ will be unknown to observers (within a security factor).
+
+    \item Since $q_t$ is computed from the `view-received' key $k^{vr}$, only $k^{vr}$ and $K^s$ are required in order to view owned e-notes (important in Section \ref{subsec:implementers-addressing-schemes}).
+
+    \item Commitment blinding factors $y_t$ are created in the random oracle model, instead of being generated randomly. [[[justify better?]]]
+
+    \item The values $k_{a,sender,t}$ and $y_t$ must be statistically independent [[[formalize/justify better? if $y_t == k_{a,sender}$, then someone who knows $b_t$ can uncover $K^s_t$]]]. The simple solution recommended is domain-separated hashes.
+
+    \item \textbf{Optimization}: If $K^{DH}$ is the same between multiple recipients, then those recipients can share an e-note private key $r$ and e-note public key $R$.\footnote{This optimization would not be useful in a cryptocurrency like MobileCoin where only e-notes and linking tags are stored in the ledger, and transactions are discarded. Without some kind of distinct `transaction object', it isn't possible to associate a single value $R$ with multiple e-notes (without replication).}
+
+    \begin{itemize}
+        \item If $r$ is reused, then, to ensure each $q_t$ is unique even if multiple e-notes have the same recipient, an index $t$ can be used to further domain-separate the hash: $q_t = \mathcal{H}_1(r K^{vr}_t, t)$.
+
+        \item If all recipients other than the transaction author himself (e.g.\ if he has a change e-note) share a $K^{DH}$, then the transaction author can `borrow' that $K^{DH}$ for e-notes he is sending himself. He can use a temporary view-received key $K^{vr}_{temp} = k^{vr} K^{DH}$ for that change e-note.
+    \end{itemize}
+
+    This way, if all recipients have the same $K^{DH}$, only one e-note public key $R = r K^{DH}$ needs to be recorded in the transaction, and users searching for owned e-notes only have to compute $k^{vr} R$ once per transaction.\footnote{If only a strict subset of a transaction's recipients can share a $K^{DH}$, then, rather than producing one $R$ value for that subset and another $R_t$ value for the other recipients, it may be better to produce a separate $R_t$ for all recipients. The reason is a privacy concern. Namely, if different subsets of recipients share different $R$ values, then observers will learn some information about the difference between recipients. In Monero, there is currently a proposal to standardize e-note public key use \cite{update-tx-supplement-proposal-monero}, such that A) a transaction must have at least two outputs, B) if a transaction has two outputs then it may only have one $R$ value, and C) if there are more than two outputs then there must be one $R_t$ value per output. In MobileCoin, every transaction output must have its own $R_t$ value \cite{mom-1}.}
+\end{itemize}
+
+
+\subsection{Addressing schemes}
+\label{subsec:implementers-addressing-schemes}
+
+Up to this point user addressing has been `open-ended'. The values $k^{vr}, K^{DH}, k_{a,recipient}, k_{b,recipient}$ were left as implementation details.
+
+Here we will discuss two useful schemes for defining those values.
+
+\subsubsection{Terminology}
+
+First it is worth laying out some terms.
+
+\begin{itemize}
+    \item \textbf{Account}: Let an account be tuple of private keys: $\{k^{vr}, k^{vs}, k^s\}$. Here $k^{vs}$ is the `view-spent' key, which we will elaborate on later.
+
+    \item \textbf{Address}: Let an address be a generic term for an address tuple $\{K^{DH}, K^{vr}, K^s\}$ that a potential recipient may transmit to transaction authors for receipt of e-notes.
+
+    \item \textbf{Normal address}: Let a normal address be an address generated `directly' from the account keys. In other words, $\{K^{DH} = K^{DH}, K^{vr} = k^{vr} K^{DH}, K^s = k^{vs} U + k^s G\}$.
+
+    \item \textbf{Subaddress}: Let a subaddress $i \in 1,...,n$ be an `alternative' address derived from the account keys \cite{MRL-0006-subaddresses, subaddress-pull-request}. A subaddress $\{K^{DH,i}, K^{vr,i}, K^{s,i}\}$ should be statistically independent of its corresponding normal address $\{K^{DH}, K^{vr}, K^s\}$ (i.e.\ no observer should be able to determine they are based on the same account keys, within a security factor).
+\end{itemize}
+
+\subsubsection{Address scheme variant 1}
+
+In address scheme variant 1, addresses are a two-key tuple $\{K^{vr}, K^s\}$ and the Diffie-Hellman base key is implicitly defined.
+
+\begin{itemize}
+    \item \textbf{Normal addresses}
+    \begin{align*}
+        K^{DH} &= G  \\
+        K^{vr} &= k^{vr} G  \\
+        K^{s} &= k^{vs} U + k^s G
+    \end{align*}
+
+    \item \textbf{Subaddresses}
+    \begin{align*}
+        K^{DH,i} &= K^{s,i}  \\
+        K^{vr,i} &= k^{vr} K^{s,i}  \\
+        K^{s,i} &= \mathcal{H}_4(k^{vr},i)*U + K^s
+    \end{align*}
+\end{itemize}
+
+There are several important details to take note of.
+
+\begin{itemize}
+    \item A potential recipient must indicate to transaction authors whether their address is a normal address or a subaddress, so the correct $K^{DH}$ value can be used.
+
+    \item Addresses from the same account are statistically independent (within a security factor). [[[formalize/justify?]]]
+
+    \item An account-holder can identify any e-note that they own with just the view-received private key $k^{vr}$ (and normal address spend key $K^s$), regardless of if it was sent to a normal address or any subaddress. Importantly, when searching the ledger for owned e-notes, an account holder only needs to compute {\em one} Diffie-Hellman exchange per e-note (at most) to recover funds owned by any address in the account.
+
+    \textbf{Note}: An e-note can only be identified as `owned' if the user has a local record of the public spend key of the address that owns that e-note. In practice, users must pre-generate all subaddresses that might plausibly own an e-note (which can be done if you know $k^{vr}$ and the normal address), and only hand out subaddresses from that set for receipt of funds.
+
+    \item The view-spent private key $k^{vs}$, in combination with $q_t$ (computed using $k^{vr}$), is required in order to compute linking tags.
+
+    \item The above two points mean users have access to three tiers of wallet permissions.
+
+    \begin{enumerate}
+        \item \textbf{View received}: View e-notes received to the account. Can generate any subaddress.
+        \begin{itemize}
+            \item \textbf{Requires}: $k^{vr}, K^s$
+        \end{itemize}
+
+        \item \textbf{Balance recovery}: View received e-notes and identify which ones have been spent.
+        \begin{itemize}
+            \item \textbf{Requires}: $k^{vr}, k^{vs}, K^s$
+        \end{itemize}
+
+        \item \textbf{Full authority}: Balance recovery with the authority to spend e-notes owned by the account.
+        \begin{itemize}
+            \item \textbf{Requires}: $k^{vr}, k^{vs}, k^s$
+        \end{itemize}
+    \end{enumerate}
+\end{itemize}
+
+\textbf{Adjustment: combine tiers 1 and 2}
+
+In practice it may be acceptable to merge tiers 1 and 2 (set $k^{vs} = k^{vr}$). The reason for this is anyone with an account's $k^{vr}$ can identify e-notes in-bound to the account, including change e-notes.
+
+If membership proofs rely on a fixed-size reference set construction (e.g.\ a ring signature or one-of-many proof), then when someone receives an e-note, they can look for intersections between the e-note's transaction's inputs' e-note reference sets and the set of prior e-notes received by the account. If the recipient believes the e-note they received was a change e-note, and each of its transaction's inputs has one intersection with the owned e-note set, then it it likely that those intersections were all spent by the transaction.
+
+Since the vast majority of transactions are likely to include a change e-note, and fixed-size reference sets in existing protocols are significantly smaller than the overall amount of transactions in the network (so the probability that someone else sends you an e-note and also references one of your owned e-notes in the same transaction is very low), this heuristic is likely powerful enough to identify most spent e-notes. In other words, it would make the distinction between $k^{vr}$ and $k^{vs}$ insignificant.
+
+\subsubsection{Janus attack}
+
+Variant 1 is not flawless. Unfortunately, the Janus attack \cite{janus-attack} allows a malicious transaction author to discern if two subaddresses were derived from the same account.
+
+\begin{enumerate}
+    \item Construct an e-note from components of two subaddresses.
+    \begin{itemize}
+        \item Subaddress A: $K^{vr,A}, K^{s,A}$
+        \item Subaddress B: $K^{vr,B}, K^{s,B}$
+        \item Sender-receiver shared secret: $q_t = \mathcal{H}_1(r_t K^{vr,A})$
+        \item One-time address: $K^o = \mathcal{H}_2(q_t)*U + K^{s,B}$
+        \item E-note public key: $R_t = r_t K^{s,A}$
+    \end{itemize}
+
+    \item E-note recipient identifies they own the e-note.
+    \begin{enumerate}
+        \item Sender-receiver shared secret: $q^{nom}_t = \mathcal{H}_1(k^{vr} R_t)$
+        \item Nominal spend key: $K^{s,nominal}_t = K^o_t - \mathcal{H}_2(q^{nom}_t)*U$
+        \item If $K^{s,nominal}_t \stackrel{?}{=} K^{s,B}$, then the e-note is owned by subaddress B.
+    \end{enumerate}
+    
+    However, in this case, $R_t$ is based on subaddress A!
+
+    \item If the e-note recipient notifies the sender that they got an e-note, then the sender will know that subaddresses A and B belong to the same account (i.e.\ were constructed from the same private key tuple $\{k^{vr}, k^{vs}, k^s\}$).
+\end{enumerate}
+
+\subsubsection{Address scheme variant 2}
+
+Address scheme variant 2 is designed to mitigate the Janus attack. Addresses are a three-key tuple $\{K^a, K^{vr}, K^s\}$, where $K^{DH} = K^a$ is a so-called `ancillary key'.
+
+\begin{itemize}
+    \item \textbf{Normal addresses}
+    \begin{align*}
+        K^a &= k^{vr} G  \\
+        K^{vr} &= k^{vr} K^a  \\
+        K^{s} &= k^{vs} U + k^s G
+    \end{align*}
+
+    \item \textbf{Subaddresses}
+    \begin{align*}
+        K^{a,i} &= \mathcal{H}_4(k^{vr},i)*G + K^a  \\
+        K^{vr,i} &= k^{vr} K^{a,i}  \\
+        K^{s,i} &= \mathcal{H}_4(k^{vr},i)*U + K^s
+    \end{align*}
+\end{itemize}
+
+Compared to variant 1, only $K^{DH}$ is defined differently. This new $K^a$ value feeds into a very important rule change for e-note construction.
+
+\begin{itemize}
+    \item When constructing an e-note, define its commitment blinding factor as $y_t = \mathcal{H}_3(q_t, r_t G)$ and its e-note public key as $R_t = r_t K^a_t$.
+
+    \item After identifying that an e-note is owned by address $\{K^a, K^{vr}, K^s\}$, obtain its ancillary private key $k^a$ (i.e.\ $k^a = k^{vr}$ or $k^a = \mathcal{H}_4(k^{vr},i) + k^{vr}$) and do the following.
+    \begin{enumerate}
+        \item Compute $R^{nom}_{base,t} = (1/k^a)*R_t$.
+        \item Compute $y_t = \mathcal{H}_3(q^{nom}_t, R^{nom}_{base,t})$.
+        \item Verify that the e-note's commitment can be reconstructed: $y_t G + b_t H \stackrel{?}{=} C_t$. If not, then the e-note is malformed and can't be spent.
+    \end{enumerate}
+\end{itemize}
+
+Adding this rule change mitigates the Janus attack because an e-note owner will only be able to recompute $C_t$ if the correct $y_t$ is used, which requires the correct $R^{nom}_{base,t}$, which is only obtained if the $k^a$ used corresponds to the key $K^a$ used to compute $R_t$. Critically, the e-note owner will select $k^a$ based on which of their addresses seems to own the e-note, which is the address where $K^s == K^{s,nominal}_t$. In other words, if $R_t$ is based on an ancillary key from a different address/subaddress than the one whose spend key was used to construct the one-time address, then recomputing $C_t$ will fail.
+
+\textbf{Adjustment 1: tier 1 identifies owned outputs without amounts}
+
+In variant 1, the first wallet permission tier allows a wallet to fully view all received e-notes, including the amounts contained. However, in variant 2 it is possible to adjust the address scheme so wallet tier 1 can {\em only} identify owned e-notes, and cannot recover amounts. This may be relatively more desirable because tier 1 is mostly useful for `outsourcing' the task of identifying owned e-notes to a third party, who doesn't need to know the amounts involved.
+
+\begin{enumerate}
+    \item Let an account be the tuple of private keys $\{k^{vr}, k^{vb}, k^s\}$, where $k^{vb}$ is the `view-balance' key (replacing the `view-spent' key).
+
+    \item Define the normal ancillary key as $K^a = k^{vb} G$. The spend key is $K^s = k^{vb} U + k^s G$. There are no other changes to variant 2 addresses.
+
+    \item Define $q^{vr}_t = \mathcal{H}_1(r_t K^{vr})$ and $q^{vb}_t = \mathcal{H}_5(q^{vr}_t, r_t G)$.
+
+    \item Use $q^{vr}_t$ when defining $K^o$, and use $q^{vb}_t$ in all other places (e.g.\ $y_t = \mathcal{H}_3(q^{vb,nom}_t)$, $enc\_amount_t = \textrm{\tt enc}[q^{vb}_t](b_t)$).
+\end{enumerate}
+
+This way users have to compute $R^{nom}_{base,t} = (1/k^{vb})*R_t$ to decode the amounts in e-notes they own. The value $k^{vb}$ is called the `view-balance' key because it is required both to decode amounts and compute linking tags.
+
+The one risk to this approach is that tier 1 wallets would be unable to detect the Janus attack.
+
+\textbf{Adjustment 2: tier 1 identifies owned and spent outputs without amounts}
+
+The address scheme can be further adjusted so the first permission tier can identify both owned and spent outputs. Unfortunately, like the previous adjustment, tier 1 wallets would be unable to detect the Janus attack.
+
+Take the previous adjustment and add the following rules.
+
+\begin{enumerate}
+    \item Replace the `view-received' key $k^{vr}$ with a `view-outputs' key $k^{vo}$.
+
+    \item Let the spend key be $K^s = k^{vo} U + k^s G$.
+\end{enumerate}
+
+
+\subsection{Other recommendations}
+\label{subsec:implementers-other-recommendations}
+
+The above recommendations are not an exhaustive list. Here are some other ideas we think implementers should consider.
+
+\begin{itemize}
+    \item \textbf{Semantic constraints}: Transaction validation rules should contain as many `semantic constraints' as possible. A semantic constraint is one that limits variance in how a transaction may be constructed, without affecting the underlying security model. For example, how inputs and outputs are sorted, byte serialization, memo field format/usage, etc.
+
+    Reducing/eliminating semantic variance reduces the likelihood of `implementation fingerprinting'. If two transaction-builder implementations use different semantic conventions, then observers can easily identify what software was used to make a given transaction. This can have undesirable privacy implications for users.
+
+    \item \textbf{Decoy selection}: Membership proofs might only reference a small set of e-notes in the ledger. If `decoy' e-notes are not selected effectively, then observers may be able to use heuristics to gain an advantage when trying to guess the real spend in a transaction input.
+
+    Pure random selection of decoys is weak to the `guess-newest' heuristic, where the `newest' e-note referenced by a membership proof is most likely to be the real spend. Selecting from a gamma distribution instead is thought to best mimic the true spend distribution, and selecting `bins' (clumps) of e-notes mitigates analysis that uses circumstantial timing knowledge about a transaction. \cite{AnalysisOfLinkability}
+
+    \item \textbf{View tag optimization}: To identify an owned e-note, multiple group operations are required (Section \ref{subsec:implementers-information-recovery}). Typically, group operations are quite expensive, so the amount of time it takes to scan the ledger for owned e-notes is a function of how many group operations are executed.
+
+    One possible optimization is to include the first one byte of the value $q_t$ in e-note memos as a so-called `view tag' \cite{reduce-scan-times-view-tag-research-issue-73}. Before trying to compute $K^{s,nominal}_t = K^o_t - \mathcal{H}_2(q^{nom}_t)*U$ for a given e-note, users can first compute the view tag and check if it matches the value recorded in the e-note. If it does not match, then the step to get $K^{s,nominal}_t$ can be skipped.
+
+    \item \textbf{Transaction chaining}: Seraphis, like other transaction protocols inspired by RingCT, does not include any advanced `scripting' capabilities. This means transactions can only be constructed in limited scenarios. However, unlike RingCT and other protocols, a Seraphis implementation can be designed to permit `transaction chaining', which is beneficial for atomic swap protocols \cite{atomic-swaps-paper} (among other techniques).
+
+    Transaction chaining is the ability to construct a transaction B that spends an e-note produced by transaction A, before A has been added to the ledger. For Seraphis to support transaction chaining, the following approach can be used.
+
+    \begin{enumerate}
+        \item The ownership/unspentness proof structure should be independent from membership proofs. This means membership proof material should not be signed by the ownership/unspentness proof structure, and the two proof structures should not share any Fiat-Shamir challenges.
+
+        \item When constructing a transaction, first construct a `partial transaction'. This partial transaction contains everything {\em except} the inputs' membership proofs. The values $t_{c,i}$ and $t_{k,i}$ should be cached alongside the partial transaction.
+
+        \item When you want to finish a partial transaction, use the cached $t_{c,i}$ and $t_{k,i}$ values to construct membership proofs.
+    \end{enumerate}
+
+    Taking this approach permits transaction chaining because the second step can be executed even if the inputs being spent don't exist in the ledger. Moreover, the third step can be easily offloaded to a third party. Knowledge of the values $t_{c,i}$ and $t_{k,i}$ only allows you to identify the true spends in membership proofs, which is presumably acceptable in any situation where transaction chaining is desired.
+\end{itemize}
+
+
+
+\section{Efficiency}
+\label{sec:efficiency}
+
+- sample implementation
+    - squashed vs non-squashed
+    - aggregate CSAG \& multibase/multikey signature for ownership/unspent proofs across all inputs
+    - Grootle 1-of-many for membership proofs
+    - bulletproofs+ range proofs
