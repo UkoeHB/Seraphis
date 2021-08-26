@@ -9,7 +9,7 @@
 
 The squashed e-note model is a specialization of the Seraphis membership proof model that allows relatively simpler (and more efficient) proof structures.
 
-First we will describe the model, then discuss how it satisfies relevant Seraphis security requirements.
+First we will describe the model, then discuss how it satisfies relevant security requirements when applied to Seraphis.
 
 
 \subsection{Model}
@@ -26,7 +26,7 @@ First we will describe the model, then discuss how it satisfies relevant Seraphi
 
     \item Let $\mathbb{S}^t$ represent a set of `transformed' tuples $\{K^t_i, C^t_i\}$, where\vspace{.115cm}
     \begin{align*}
-        K^t_i &= \mathcal{H}_5(K_i, C_i)*K_i \\
+        K^t_i &= \mathcal{H}_6(K_i, C_i)*K_i \\
         C^t_i &= C_i
     \end{align*}
 
@@ -45,7 +45,7 @@ First we will describe the model, then discuss how it satisfies relevant Seraphi
 
     \item Demonstrate that, within a security parameter $k$, $\tilde{Q}$ corresponds to some $Q_{\pi} \in \mathbb{Q}$, where $\pi$ is unknown to the verifier, such that:
     \begin{enumerate}
-        \item The discrete log relation of $\tilde{Q} - Q_{\pi} = [(z' + x') - (\mathcal{H}_5(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]*G$ with respect to $G$ is known.
+        \item The discrete log relation of $\tilde{Q} - Q_{\pi} = [(z' + x') - (\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]*G$ with respect to $G$ is known.
     \end{enumerate}
 
     \item Perform a range proof on $C'$.
@@ -68,20 +68,20 @@ Let $\mathbb{S}^t$ be the input to the underlying model. We will show that the f
 \begin{enumerate}
     \item Demonstrate that, within a security parameter $k$, $\tilde{S}$ corresponds to some $S^t_{\pi} \in \mathbb{S}^t$, where $\pi$ is unknown to the verifier, such that:
     \begin{enumerate}
-        \item $s'_j == \mathcal{H}_5(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$
+        \item $s'_j == \mathcal{H}_6(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$
         \item $a'_1 == a_{\pi,1}$
-        \item The prover must have knowledge of $\mathcal{H}_5(K_{\pi}, C_{\pi})*z_{\pi}$.
+        \item The prover must have knowledge of $\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi}$.
     \end{enumerate}
 \end{enumerate}
 
 Observe the following.
 
 \begin{enumerate}
-    \item The prover must know $[(z' + x') - (\mathcal{H}_5(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]$ and $z'$ to satisfy the squashed e-note model, and $x'$ and $x_{\pi}$ to construct the range proofs on $C'$ and $C^t_{\pi}$. Therefore the prover must know $\mathcal{H}_5(K_{\pi}, C_{\pi})*z_{\pi}$. The point $\mathcal{H}_5(K_{\pi}, C_{\pi})$ is considered `public knowledge', so the prover must also know $z_{\pi}$.
+    \item The prover must know $[(z' + x') - (\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]$ and $z'$ to satisfy the squashed e-note model, and $x'$ and $x_{\pi}$ to construct the range proofs on $C'$ and $C^t_{\pi}$. Therefore the prover must know $\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi}$. The point $\mathcal{H}_6(K_{\pi}, C_{\pi})$ is considered `public knowledge', so the prover must also know $z_{\pi}$.
 
-    \item Range proofing $C_{\pi}$ and $C'$ means they have the form $x G + a H$, implying they contain no $G_1,...,G_n$ components. Therefore, demonstrating discrete log with respect to $G$ in the commitment to zero $\tilde{Q} - Q_{\pi}$ means it must be the case that $s'_j == \mathcal{H}_5(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$.
+    \item Range proofing $C_{\pi}$ and $C'$ means they have the form $x G + a H$, implying they contain no $G_1,...,G_n$ components. Therefore, demonstrating discrete log with respect to $G$ in the commitment to zero $\tilde{Q} - Q_{\pi}$ means it must be the case that $s'_j == \mathcal{H}_6(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$.
 
-    \item Suppose $K_i$ has the form $K_i = z_i G + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n + b H$. Since the model demonstrates that $K'$ does not contain any $H$ components, and the commitment to zero $\tilde{Q} - Q_{\pi}$ means all non-$G$ components balance in those two points, it must be the case that $C' = x' G + (a_{i,1} + \mathcal{H}_5(K_{\pi}, C_{\pi})*b)*H$. However, the term $\mathcal{H}_5(K_{\pi}, C_{\pi})$ is both uniformly distributed and implicitly dependent on the values $a_{i,1}$ and $b$, so the value $a'_1 = (a_{i,1} + \mathcal{H}_5(K_{\pi}, C_{\pi})*b)$ will be uniformly distributed in $\mathbb{F}_l$ (assuming $b$ is non-zero). Since the range proof on $C'$ means that $a'_1$ must be in the range $[0,...,2^z - 1]$, if $b \neq 0$ then the probability that a range proof on $a'_1$ can succeed is $2^z/l$. This means $a'_1 == a_{i,1}$ can be assumed to be true within the security parameter $k$ if $1/k > 2^z/l$.\footnote{Typically $l \approx 2^{252} - 2^{256}$, $2^z = 2^{64}$, and $k = 2^{128}$; $1/2^{128} > 2^{64}/2^{252}$ is true.} [[[formalize better?]]]
+    \item Suppose $K_i$ has the form $K_i = z_i G + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n + b H$. Since the model demonstrates that $K'$ does not contain any $H$ components, and the commitment to zero $\tilde{Q} - Q_{\pi}$ means all non-$G$ components balance in those two points, it must be the case that $C' = x' G + (a_{i,1} + \mathcal{H}_6(K_{\pi}, C_{\pi})*b)*H$. However, the term $\mathcal{H}_6(K_{\pi}, C_{\pi})$ is both uniformly distributed and implicitly dependent on the values $a_{i,1}$ and $b$, so the value $a'_1 = (a_{i,1} + \mathcal{H}_6(K_{\pi}, C_{\pi})*b)$ will be uniformly distributed in $\mathbb{Z}_l$ (assuming $b$ is non-zero). Since the range proof on $C'$ means that $a'_1$ must be in the range $[0,...,2^z - 1]$, if $b \neq 0$ then the probability that a range proof on $a'_1$ can succeed is $2^z/l$. This means $a'_1 == a_{i,1}$ can be assumed to be true within the security parameter $k$ if $1/k > 2^z/l$.\footnote{Typically $l \approx 2^{252} - 2^{256}$, $2^z = 2^{64}$, and $k = 2^{128}$; $1/2^{128} > 2^{64}/2^{252}$ is true.} [[[formalize better?]]]
 \end{enumerate}
 
 \subsubsection{Seraphis structure}
@@ -91,20 +91,20 @@ Observe the following.
 
     \item In Seraphis, range proofs on $C_i$ are created when e-notes are first constructed (i.e.\ as outputs of a transaction). This means transaction authors, who reference $C_i$ as part of transaction membership proofs, will not themselves construct range proofs on $C_i$. As a consequence, transaction authors won't necessarily know $x_{\pi}$.
 
-    However, we do not consider this a security problem. When a transaction author sends an e-note to a recipient, they are `delegating spend authority' to that recipient. In the context of membership proofs (i.e.\ step 8 above), any person who knows $(\mathcal{H}_5(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})$ must have learned that value by cooperating with the original transaction author. Therefore, whoever constructs a membership proof for an e-note in the above model must be acting as a `proxy' of that e-note's original author. Since the author knows $x_{\pi}$ (recall that they must have range proofed $C_{\pi}$), the value $\mathcal{H}_5(K_{\pi}, C_{\pi})*z_{\pi}$ can be derived from the combined knowledge of the author and his proxy.
+    However, we do not consider this a security problem. When a transaction author sends an e-note to a recipient, they are `delegating spend authority' to that recipient. In the context of membership proofs (i.e.\ step 8 above), any person who knows $(\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})$ must have learned that value by cooperating with the original transaction author. Therefore, whoever constructs a membership proof for an e-note in the above model must be acting as a `proxy' of that e-note's original author. Since the author knows $x_{\pi}$ (recall that they must have range proofed $C_{\pi}$), the value $\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi}$ can be derived from the combined knowledge of the author and his proxy.
 
     To gain further confidence in this roundabout security proof, consider the following.
     \begin{enumerate}
-        \item An e-note's author cannot create a membership proof for that e-note (i.e.\ complete step 8 in the model) unless they know $\mathcal{H}_5(K_{\pi}, C_{\pi})*z_{\pi}$. This trivially follows from the fact they know $x_{\pi}$ as the one who range proved $C_{\pi}$, and they must know $\mathcal{H}_5(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi}$ as the one who performed step 8 in the above model.
+        \item An e-note's author cannot create a membership proof for that e-note (i.e.\ complete step 8 in the model) unless they know $\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi}$. This trivially follows from the fact they know $x_{\pi}$ as the one who range proved $C_{\pi}$, and they must know $\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi}$ as the one who performed step 8 in the above model.
 
-        \item Suppose $p_1 + p_2 = \mathcal{H}_5(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi}$ ($p_1$ or $p_2$ could be zero). Let the e-note author know $x_{\pi}$ and $p_2$; let the prover of step 8 know $p_1$. In order to complete step 8 from above, the prover must learn $p_2$. Can the prover acquire the pair $p_1, p_2$ without collaborating with someone who knows $x_{\pi}$?
+        \item Suppose $p_1 + p_2 = \mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi}$ ($p_1$ or $p_2$ could be zero). Let the e-note author know $x_{\pi}$ and $p_2$; let the prover of step 8 know $p_1$. In order to complete step 8 from above, the prover must learn $p_2$. Can the prover acquire the pair $p_1, p_2$ without collaborating with someone who knows $x_{\pi}$?
 
         [[[formal proof? this is giving me a lot of trouble]]]
     \end{enumerate}
 
-    \item Seraphis linking tags are computed from the output of a membership proof, namely the point $K'$ in $\tilde{S}$. However, $K'$ in the squashed e-note model applied to Seraphis has the form $K' = t_k G + \mathcal{H}_5(K^o_{\pi}, C_{\pi})*[k^o_a*U + k^o_b*G]$. This means linking tags will have the form $\tilde{K} = (1/(\mathcal{H}_5(K^o_{\pi}, C_{\pi})*k^o_a)*G$ instead of $\tilde{K} = (1/k^o_a)*G$. Since $\mathcal{H}_5(K^o_{\pi}, C_{\pi})$ is uniquely defined by each e-note (and not malleable), these modified linking tags are also unique per e-note. In other words, only one linking tag can be produced for each e-note in the ledger.
+    \item Seraphis linking tags are computed from the output of a membership proof, namely the point $K'$ in $\tilde{S}$. However, $K'$ in the squashed e-note model applied to Seraphis has the form $K' = t_k G + \mathcal{H}_6(K^o_{\pi}, C_{\pi})*[k^o_a*U + k^o_b*G]$. This means linking tags will have the form $\tilde{K} = (1/(\mathcal{H}_6(K^o_{\pi}, C_{\pi})*k^o_a))*G$ instead of $\tilde{K} = (1/k^o_a)*G$. Since $\mathcal{H}_6(K^o_{\pi}, C_{\pi})$ is uniquely defined by each e-note (and not malleable), these modified linking tags are also unique per e-note. In other words, only one linking tag can be produced for each e-note in the ledger.
 
-    There is one interesting side-effect. The value $\mathcal{H}_5(K^o_{\pi}, C_{\pi})$ is dependent on the e-note commitment $C_{\pi}$, so it is possible for two e-notes with the same address $K^o$ to produce different linking tags if they have different commitments.
+    There is one interesting side-effect. The value $\mathcal{H}_6(K^o_{\pi}, C_{\pi})$ is dependent on the e-note commitment $C_{\pi}$, so it is possible for two e-notes with the same address $K^o$ to produce different linking tags if they have different commitments.
 
     \item Step 10 in the above model is automatically satisfied by Seraphis because $K'$ is passed as input to the ownership/unspentness proof system, which demonstrates knowledge of the per-generator discrete log relations of its inputs.
 \end{enumerate}
