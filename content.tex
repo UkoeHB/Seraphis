@@ -1,7 +1,7 @@
 \textbf{Seraphis: A Privacy-Preserving Transaction Protocol Abstraction (WIP)}\\
 koe\footnote{Author `koe' worked on this document partly as an employee of MobileCoin, Inc.}\footnote{This is just a draft, so it may not always be available wherever it is currently hosted.} \texttt{ukoe@protonmail.com}\\
 \today\\
-Draft v0.0.2
+Draft v0.0.3
 
 \textbf{License}: Seraphis is released into the public domain.
 
@@ -17,9 +17,9 @@ Seraphis\footnote{The name `Seraphis' is based on Serapis, a Graeco-Egyptian syn
 
 Seraphis is a transaction protocol abstraction for p2p electronic cash systems. What is a `p2p electronic cash system' and why does it need a `transaction protocol'?
 
-A p2p (peer-to-peer) electronic cash system is a monetary system where the entire supply of currency is stored/recorded in digital form, and transactions (attempts to transfer money to new owners) are mediated by a network of {\em peers} (usually called {\em nodes}). Such systems are typically designed so no participant in the system has the power to easily censor transactions, re-spend funds that have been spent before, or increase the total money supply at will.
+A p2p (peer-to-peer) electronic cash system is a monetary system where the entire supply of currency exists as a digital record that can be stored by any person, and transactions (attempts to transfer money to new owners) are mediated by a network of {\em peers} (usually called {\em nodes}). Such systems are typically designed so no participant in the system has the power to easily censor transactions, re-spend funds that have been spent before, or increase the total money supply at will.
 
-To achieve those design goals, it is necessary for such systems to be decentralized. The peers who mediate transactions (checking their validity with respect to the existing state of the money supply, and deciding which of N conflicting transactions to accept) do not necessarily trust each other. It is therefore beneficial to have a common rule-set and format for constructing transactions, so that any peer can validate any transaction and reach consensus with other peers/nodes about mutations of the monetary state. The transaction rule-set and format used by any given p2p electronic cash system is called its {\em transaction protocol}.
+To achieve those design goals, it is necessary for such systems to be decentralized. The peers who mediate transactions (checking their validity with respect to the existing state of the money supply, and deciding which of N conflicting transactions to accept) do not necessarily trust each other. It is therefore beneficial to have a common rule-set and format for constructing transactions, so that any peer can validate any transaction and reach consensus with other peers/nodes about mutations of the monetary state (digital record). The transaction rule-set and format used by any given p2p electronic cash system is called its {\em transaction protocol}.
 
 Seraphis is a transaction protocol {\em abstraction}, which means it defines the rule-set that a transaction protocol must satisfy (and the corresponding security model) without specifying any concrete proving systems.
 
@@ -56,7 +56,7 @@ A very simple transaction protocol could implement those rules like this:
 \begin{itemize}
     \item \textbf{Membership}: Reference existing e-notes with their indices in the ledger. Transaction validators can look up those e-notes directly.
     \item \textbf{Unspentness}: When an e-note is spent by a transaction, set a bit flag next to that e-note in the ledger. Reject transactions that reference spent e-notes.
-    \item \textbf{Ownership}: Define ownership with public key cryptography. Let each e-note's address record a public key specified in advance by the intended recipient. To spend an e-note, its owner must create a cryptographic signature with its public key and add the signature to their transaction.
+    \item \textbf{Ownership}: Define ownership with public key cryptography. Let each e-note's address record a public key specified in advance by the intended recipient. To spend an e-note, its owner must create a cryptographic signature with its public key and add the signature to their transaction.\footnote{Cryptocurrencies have the `crypto' prefix because they use cryptography to control ownership of e-notes.}
     \item \textbf{Amount balance}: Record e-note amounts in clear text and use simple sums to check that input amounts equal output amounts (disallowing integer overflow).
 \end{itemize}
 
@@ -93,7 +93,7 @@ Most of these requirements are (relatively easily) met by CryptoNote-style addre
 
 \begin{itemize}
     \item Observers can, to some extent, discern when a transaction was constructed, which is stronger information than simply `when a transaction was added to the ledger'. The biggest culprit for this lies in transaction fees, which are often a function of real-world time. The problem of transaction timing is out-of-scope for this paper.
-    \item Observers can, to some extent, discern relationships between transactions. Membership proofs defined in RingCT (and those used in related protocols like Triptych \cite{triptych-preprint}, Lelantus \cite{lelantus-preprint} [[[change citation?]]], Omniring \cite{omniring-paper}, and RingCT3.0 \cite{ringct3-preprint}) have `anonymity sets'. A transaction author proves that each e-note spent by their transaction exists in a small set of e-notes, and further proves that that small set is a subset of e-notes that exist in the ledger. With this method, observers know there is more likely to be a relationship between two transactions if one of them references an e-note created by the other, than if no such connection exists. This probabilistic knowledge is stronger than the `pure/ideal' case where membership proofs show that e-notes exist in the ledger without giving any hints about which ones they might be.
+    \item Observers can, to some extent, discern relationships between transactions. Membership proofs defined in RingCT (and those used in related protocols like Triptych \cite{triptych-preprint}, Lelantus \cite{lelantus-preprint} [[[change citation?]]], Omniring \cite{omniring-paper}, and RingCT3.0 \cite{ringct3-preprint}) have `anonymity sets'. A transaction author proves that each e-note spent by their transaction exists in a small set of e-notes, and further proves that that small set is a subset of e-notes that exist in the ledger. With this method, observers know there is more likely to be a relationship between two transactions if one of them references an e-note created by the other than if no such connection exists. This probabilistic knowledge is stronger than the `pure/ideal' case where membership proofs show that e-notes exist in the ledger without giving any hints about which ones they might be.
 \end{itemize}
 
 Increasing the anonymity set size of membership proofs naturally reduces how much information observers can glean from transactions. However, combining membership proofs with ownership and unspentness proofs in one large proving structure, a ubiquitous pattern in previous RingCT-inspired protocols, has led to some challenges around increasing that size.
@@ -124,7 +124,7 @@ This separation allows the definition of linking tags to be fairly open-ended. W
 
 In Appendix \ref{appendix:squashed-e-note-model-model} we introduce a more-restrictive membership proof model layered on the primary model in this paper. We call it the `squashed e-note' model. Concrete proving structures in that model are non-trivially more efficient than structures in the plain model, allowing relatively larger anonymity set sizes as a function of proof complexity and size compared to structures in the plain model, when comparing structures based on the same proving systems.
 
-Also note that Seraphis permits `transaction chaining', where it is possible to construct a transaction B that spends an e-note from transaction A before A has been added to the ledger (Section~\ref{subsec:implementers-other-recommendations}), and `membership proof delegation', where constructing a membership proof is delegated to a third party without revealing any wallet private keys. Combining these yields `transaction chaining by delegation', where the author of transaction B authorizes the transfer of funds from an e-note that doesn't exist in the chain, then gives their partial transaction (without a membership proof) to the author of transaction A (which creates that e-note), who can complete transaction B and submit it after they have completed and submitted transaction A.\footnote{Transaction chaining by delegation gets even more interesting if combined with something like Monero's lock-time. A Monero transaction author can define the earliest blockchain height where the new e-notes they create can be spent. Suppose transaction B spends an e-note that doesn't exist in the ledger (blockchain) {\em and} an e-note with a certain lock-time, then author B delegates completing the transaction to author A. Author A cannot submit transaction B until that locked e-note can be spent. If they submit transaction A right away, then there will be a period of time where the e-note it creates can't be spent by transaction B. Author B could make another transaction B' in that time that spends the e-note. We leave the application of these ideas to a useful protocol as an exercise for the reader.}
+Also note that Seraphis permits `transaction chaining', where it is possible to construct a transaction B that spends an e-note from transaction A before A has been added to the ledger (Section~\ref{subsec:implementers-other-recommendations}), and `membership proof delegation', where constructing a membership proof is delegated to a third party without revealing any wallet private keys (also Section~\ref{subsec:implementers-other-recommendations}). Combining these yields `transaction chaining by delegation', where the author of transaction B authorizes the transfer of funds from an e-note that doesn't exist in the chain, then gives their partial transaction (without a membership proof) to the author of transaction A (which creates that e-note), who can complete transaction B and submit it after they have completed and submitted transaction A.\footnote{Transaction chaining by delegation gets even more interesting if combined with something like Monero's lock-time. A Monero transaction author can define the earliest blockchain height where the new e-notes they create can be spent. Suppose transaction B spends an e-note that doesn't exist in the ledger (blockchain) {\em and} an e-note with a lock-time in the near future, then author B delegates completing the transaction to author A. Author A cannot submit transaction B until that locked e-note can be spent. If they submit transaction A right away, then there will be a period of time where the e-note it creates can't be spent by transaction B. Author B could make another transaction B' in that time that spends the e-note. We leave the application of these ideas to a useful protocol as an exercise for the reader.}
 
 
 
@@ -140,13 +140,13 @@ Also note that Seraphis permits `transaction chaining', where it is possible to 
 \subsection{Notation}
 \label{subsec:preliminaries-notation}
 
-no exponents, only superscripts
+\begin{itemize}
+    \item We use additive notation for group operations. This means, for example, that in terms $k^o_a$ and $K^o$, the $o$ is always a superscript and never an exponent.
 
-Pedersen commitments? vG + aH
+    \item For group element $P$ and field element $x \in \mathbb{Z}_l$, $x P$ and $x*P$ both indicate scalar multiplication. The use of asterisks ($*$) in some places but not others is meant to aid visual clarity where appropriate.
 
-non-pedersen commitments? vG + P
-
-range proof? for pedersen commitment, demonstrate composition (DL known on G and H), a /in [0, 2\^64 - 1]
+    \item Modular multiplicative inverse group operations are denoted like $(1/x)*P$.
+\end{itemize}
 
 
 
@@ -183,7 +183,7 @@ For context, we outline the content of a transaction here.
 Seraphis e-notes are composed of an amount commitment, an address, and a memo.
 
 \begin{itemize}
-    \item \textbf{Amount commitment}: A Pedersen commitment $C$ (with blinding factor $x$) to the amount $a$ possessed by the e-note.
+    \item \textbf{Amount commitment}: A Pedersen commitment $C$ (with blinding factor $x$) to the amount $a$ possessed by the e-note \cite{Pedersen1992, maxwell-ct-2}.
     \[C = x G + a H\]
 
     \item \textbf{Address}: A public key $K^o$ composed of two generators $U$ and $G$, and two corresponding private keys $k^o_a$ and $k^o_b$. The e-note's owner must prove knowledge of those private keys if they want to transfer the amount $a$ to new e-notes.\vspace{.115cm}
@@ -235,7 +235,7 @@ We further argue in Sections \ref{subsec:seraphis-membership proofs}, \ref{subse
 
 Linking tags are uniquely defined by the private key $k^o_a$. This means for a user to create two distinct linking tags from the same address, they must be able to solve the DLP between generators $U$ and $G$, which we assume to be a hard problem [[[elaborate this proof?]]].
 
-Since linking tags are assumed to be unique for each unique address $K^o$, they can be used to prove unspentness. If a transaction contains an e-note-image with a linking tag that has appeared in the ledger, then that transaction is invalid.
+Since linking tags are assumed to be unique for each unique address $K^o$, they can be used to prove unspentness. If a transaction contains an e-note-image with a linking tag that has appeared in the ledger, then that transaction is invalid. The word `linking' refers to the ability of observers to link attempts to spend the same e-note.
 
 Note that if two e-notes have the same address $K^o$, then only {\em one} of them can be spent, hence the superscript $o$. Going along with the CryptoNote tradition, $K^o$ can be referred to as a {\em one-time address}. The construction of one-time addresses is discussed in Sections \ref{subsec:seraphis-address-model} and \ref{subsec:implementers-information-recovery}.
 
@@ -253,7 +253,7 @@ A proving system/structure is only eligible to be used as a Seraphis membership 
     \item Let $\mathbb{S}$ represent a set of tuples $\{K_i, C_i\}$, where\vspace{.115cm}
     \begin{align*}
         K_i &= z_i G + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n \\
-        C_i &= x_i G + a_{i,1} H_1 + a_{i,2} G_2 + ... + a_{i,n} H_n
+        C_i &= x_i G + a_{i,1} H_1 + a_{i,2} H_2 + ... + a_{i,n} H_n
     \end{align*}
 
     \item Let $\tilde{S}$ represent a tuple $\{K', C'\}$, where\vspace{.115cm}
@@ -285,27 +285,16 @@ Alongside each membership proof must be an ownership and unspentness proof. In S
 A proof structure is only eligible to be used for Seraphis ownership/unspentness proofs if it can accomplish the following.
 
 \begin{enumerate}
-    \item Assume there is a group point $K = x G + y U$. Let\vspace{.115cm}
-    \begin{align*}
-        \tilde{K} &= (1/y)*G \\
-        K_{t1} &= (1/y)*K \\
-        K_{t2} &= K_{t1} - U
-    \end{align*}
+    \item Assume there is a group point $K = x G + y U$.
 
-    \item Demonstrate the simultaneous discrete log of $K_{t1}$ and $\tilde{K}$ with respect to $K$ and $G$. A simultaneous discrete log proof shows knowledge of a single scalar that is the discrete log between two pairs of group elements (in this case $(1/y)$). [[[formalize better?]]]
+    \item Demonstrate knowledge of values $x$ and $y$ such that $K = x G + y U$.
 
-    \item Demonstrate the discrete log of $K_{t2} = (x/y)*G$ with respect to $G$.
+    \item Demonstrate that a key $\tilde{K}$ satisfies $\tilde{K} == (1/y)*G$.
+
+    \item An observer who knows none of $x, y, x G$ or $y U$ should be able to derive $y U$ from the resulting proof.
 \end{enumerate}
 
-This `composition' proof system shows that:
-
-\begin{itemize}
-    \item The prover knows values $x$ and $y$ such that $K = x G + y U$.
-
-    \item $\tilde{K} == (1/y)*G$
-\end{itemize}
-
-We can apply composition proofs to Seraphis in the following way.
+We can apply such a `composition' proof to Seraphis in the following way (see Appendix \ref{appendix:generalized-schnorr-signatures} for an example proof structure that satisfies this model).
 
 Suppose a membership proof $\sigma_{mp}$ shows that $\tilde{S}$ corresponds to some $S_{\pi}$ in the set $\mathbb{S}$. Then suppose the key $K' = z' G + s'_1 G_1$ from $\tilde{S}$ is passed as input to the above proof system, and a valid proof is created. Observe the following.
 
@@ -367,7 +356,7 @@ The maximum number of elements $n$ allowed on one side of a balance check must b
 
 In a real system based on Seraphis, only new e-note commitments need range proofs, not e-note-image commitments. Membership proofs should only reference e-notes from the ledger, which should all have range proofs, so it is guaranteed (within a security factor) that e-note-image commitments contain legitimate amounts.
 
-Importantly, range proofing new e-note commitments `locks in' the structure $C = x G + a H$. Since Seraphis membership proofs act on e-notes found in the ledger (i.e.\ as converted into $\mathbb{S}$), which should all have range proofs, it must be the case that in any Seraphis membership proof, $H_1 == H$ and $a_{\pi,x} == 0$ for $x \geq 2$.
+Importantly, range proofing new e-note commitments `locks in' the structure $C = x G + a H$. Since Seraphis membership proofs act on e-notes found in the ledger (i.e.\ as converted into $\mathbb{S}$), which should all have range proofs, it must be the case that in any Seraphis membership proof $H_1 == H$ and $a_{\pi,x} == 0$ for $x \geq 2$.
 
 \subsubsection{Sender-receiver anonymity}
 \label{subsubsec:confidential-transactions-sender-receiver-anonymity}
@@ -551,6 +540,7 @@ The answer first pioneered by CryptoNote \cite{cryptoNoteWhitePaper} for privacy
         \item Decode the amount: $b_t = \textrm{\tt dec}[q^{nom}_t](enc\_amount_t)$.
         \item Compute the commitment blinding factor: $y_t = \mathcal{H}_3(q^{nom}_t)$.
         \item Verify that the e-note's commitment can be reconstructed: $y_t G + b_t H \stackrel{?}{=} C_t$. If not, then the e-note is malformed and can't be spent.
+        \item Compute the linking tag $\tilde{K}_t = (1/(q^{nom}_t + k_{a,recipient}))*G$. If they find a copy of $\tilde{K}_t$ in the ledger, then this e-note has already been spent.
     \end{enumerate}
 \end{enumerate}
 
@@ -629,7 +619,7 @@ There are several important details to take note of.
 
     \textbf{Note}: An e-note can only be identified as `owned' if the user has a local record of the public spend key of the address that owns that e-note. In practice, users must pre-generate all subaddresses that might plausibly own an e-note (which can be done if you know $k^{vr}$, the normal address, and a list/range of plausible subaddress indices), and should only hand out subaddresses from that set for receipt of funds.
 
-    \item The view-spent private key $k^{vs}$, in combination with $q_t$ (computed using $k^{vr}$), is required in order to compute linking tags.
+    \item The view-spent private key $k^{vs}$, in combination with $q_t$ (computed using $k^{vr}$), is required in order to compute linking tags: $\tilde{K}_t = (1/(q_t + k^{vs}))*G$.
 
     \item The above two points mean users have access to three tiers of wallet permissions.
 
@@ -782,6 +772,8 @@ The above recommendations are not an exhaustive list. Here are some other ideas 
     \end{enumerate}
 
     Taking this approach permits transaction chaining because the second step can be executed even if the inputs being spent don't exist in the ledger. Moreover, the third step can be easily offloaded to a third party. Knowledge of the values $t_{c,i}$ and $t_{k,i}$ only allows you to identify the true spends in membership proofs, which is presumably acceptable in any situation where transaction chaining is desired.
+
+    \item \textbf{Flexible membership proof delegation}: Rather than randomly generating $t_{c,i}$ and $t_{k,i}$, it may be better to generate them in the random oracle model, such as $t_{c,i} = \mathcal{H}_c(k^{vr}, k^{vs}, K^o, C)$ and $t_{k,i} = \mathcal{H}_k(k^{vr}, k^{vs}, K^o, C)$. This way, for example, a tier 2 wallet can construct membership proofs independently of a tier 3 wallet that focuses on constructing/signing ownership/unspentness proofs.
 \end{itemize}
 
 
@@ -792,5 +784,5 @@ The above recommendations are not an exhaustive list. Here are some other ideas 
 - sample implementation
     - squashed vs non-squashed
     - aggregate CSAG \& multibase/multikey signature for ownership/unspent proofs across all inputs
-    - Grootle 1-of-many for membership proofs
-    - bulletproofs+ range proofs
+    - Grootle 1-of-many for membership proofs (or Triptych+ style?)
+    - Bulletproofs+ range proofs

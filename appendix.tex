@@ -106,6 +106,8 @@ Observe the following.
 
     There is one interesting side-effect. The value $\mathcal{H}_6(K^o_{\pi}, C_{\pi})$ is dependent on the e-note commitment $C_{\pi}$, so it is possible for two e-notes with the same address $K^o$ to produce different linking tags if they have different commitments.
 
+    However, since $\mathcal{H}_6(K^o_{\pi}, C_{\pi})$ is `public knowledge', if two e-notes with the same one-time address are spent, then observers would see that they are both spent with the test $\mathcal{H}_6(K^o_{x}, C_{x})\tilde{K}_x \stackrel{?}{=} \mathcal{H}_6(K^o_{y}, C_{y})\tilde{K}_y$. For this reason, we recommend mandating that all one-time addresses in the ledger be unique if the squashed e-note model is used.
+
     \item Step 10 in the above model is automatically satisfied by Seraphis because $K'$ is passed as input to the ownership/unspentness proof system, which demonstrates knowledge of the per-generator discrete log relations of its inputs.
 \end{enumerate}
 
@@ -129,13 +131,28 @@ Observe the following.
     - concise aggregation on common base points (compressing private keys)
     - multi-base signing (same DL across multiple bases)
 
+Application of these concepts to Seraphis ownership/unspentness proofs...
+
+\begin{enumerate}
+    \item Assume there is a group point $K = x G + y U$.
+
+    \item Let\vspace{.115cm}
+    \begin{align*}
+        \tilde{K} &= (1/y)*G \\
+        K_{t1} &= (1/y)*K \\
+        K_{t2} &= K_{t1} - U
+    \end{align*}
+
+    \item Demonstrate the simultaneous discrete log of $K_{t1}$ and $\tilde{K}$ with respect to $K$ and $G$. A simultaneous discrete log proof shows knowledge of a single scalar that is the discrete log between two pairs of group elements (in this case $(1/y)$). [[[formalize better?]]]
+
+    \item Demonstrate the discrete log of $K_{t2} = (x/y)*G$ with respect to $G$.
+\end{enumerate}
+
 
 
 \section{Groth/Bootle one-of-many proofs}
 \label{appendix:grootle-one-of-many-proofs}
 
 - Grootle (parallel vs non-parallel)
-
-
 
 \end{appendices}
