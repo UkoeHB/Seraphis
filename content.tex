@@ -1,10 +1,3 @@
-\textbf{Seraphis: A Privacy-Preserving Transaction Protocol Abstraction (WIP)}\\
-koe\footnote{Author `koe' worked on this document partly as an employee of MobileCoin, Inc.}\footnote{This is just a draft, so it may not always be available wherever it is currently hosted.} \texttt{ukoe@protonmail.com}\\
-\today\\
-Draft v0.0.3
-
-\textbf{License}: Seraphis is released into the public domain.
-
 \section{Abstract}
 \label{sec:abstract}
 
@@ -291,7 +284,7 @@ A proof structure is only eligible to be used for Seraphis ownership/unspentness
 
     \item Demonstrate that a key $\tilde{K}$ satisfies $\tilde{K} == (1/y)*G$.
 
-    \item An observer who knows none of $x, y, x G$ or $y U$ should be able to derive $y U$ from the resulting proof.
+    \item An observer who knows none of $x, y, x G$ or $y U$ must be unable to derive $y U$ from the resulting proof.
 \end{enumerate}
 
 We can apply such a `composition' proof to Seraphis in the following way (see Appendix \ref{appendix:generalized-schnorr-signatures} for an example proof structure that satisfies this model).
@@ -766,14 +759,12 @@ The above recommendations are not an exhaustive list. Here are some other ideas 
     \begin{enumerate}
         \item The ownership/unspentness proof structure should be independent from membership proofs. This means membership proof material should not be signed by the ownership/unspentness proof structure, and the two proof structures should not share any Fiat-Shamir challenges.
 
-        \item When constructing a transaction, first construct a `partial transaction'. This partial transaction contains everything {\em except} the inputs' membership proofs. The values $t_{c,i}$ and $t_{k,i}$ should be cached alongside the partial transaction.
+        \item When constructing a transaction, first construct a `partial transaction'. This partial transaction contains everything {\em except} the inputs' membership proofs. The values $t_{c,j}$ and $t_{k,j}$ should be cached alongside the partial transaction.
 
-        \item When you want to finish a partial transaction, use the cached $t_{c,i}$ and $t_{k,i}$ values to construct membership proofs.
+        \item When you want to finish a partial transaction, use the cached $t_{c,j}$ and $t_{k,j}$ values to construct membership proofs.\footnote{It may be desirable for $t_{c,j}$ and $t_{k,j}$ to be deterministic, such as $t_{c,j} = \mathcal{H}_c(k^{vr}, k^{vs}, K^o_j, C_j)$ and $t_{k,j} = \mathcal{H}_k(k^{vr}, k^{vs}, K^o_j, C_j)$. This way, for example, a tier 2 wallet could construct membership proofs independently of a tier 3 wallet that focuses on constructing/signing ownership/unspentness proofs. However, since $t_{c,m}$ is defined as a function of a transaction's output e-notes (Section \ref{subsec:seraphis-confidential-transactions}), that approach is not currently feasible (or at least not completely reliable). If an implementer wants deterministic $t_{c,j}$ and $t_{k,j}$, then they should redefine the balance proof as a DL proof on the commitment to zero $\sum C'_j - \sum C_t$. We did not recommend that approach because it requires storing an extra proof in transaction data, and requires more computational effort on the part of transaction verifiers. Note that there is one edge case where using deterministic blinding factors is flawed. Since deterministic blinding factors are fixed for each e-note, they will stay the same between transaction attempts. If creating a membership proof is delegated to a third party (i.e.\ they are given the values $t_{c,j}$, $t_{k,j}$, $C_j$, $K^o_j$) for one transaction attempt, but that attempt is aborted, then that third party will be able to recognize when the e-note is spent in a different transaction attempt even if a different person creates the e-note's membership proof.}
     \end{enumerate}
 
-    Taking this approach permits transaction chaining because the second step can be executed even if the inputs being spent don't exist in the ledger. Moreover, the third step can be easily offloaded to a third party. Knowledge of the values $t_{c,i}$ and $t_{k,i}$ only allows you to identify the true spends in membership proofs, which is presumably acceptable in any situation where transaction chaining is desired.
-
-    \item \textbf{Flexible membership proof delegation}: Rather than randomly generating $t_{c,i}$ and $t_{k,i}$, it may be better to generate them in the random oracle model, such as $t_{c,i} = \mathcal{H}_c(k^{vr}, k^{vs}, K^o, C)$ and $t_{k,i} = \mathcal{H}_k(k^{vr}, k^{vs}, K^o, C)$. This way, for example, a tier 2 wallet can construct membership proofs independently of a tier 3 wallet that focuses on constructing/signing ownership/unspentness proofs.
+    Taking this approach permits transaction chaining because the second step can be executed even if the inputs being spent don't exist in the ledger. Moreover, the third step can be easily offloaded to a third party. Knowledge of the values $t_{c,j}$ and $t_{k,j}$ only allows you to identify the true spends in membership proofs, which is presumably acceptable in any situation where transaction chaining is desired.
 \end{itemize}
 
 
