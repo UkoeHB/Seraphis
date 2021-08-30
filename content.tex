@@ -129,7 +129,7 @@ Also note that Seraphis permits `transaction chaining', where it is possible to 
 
 [[[PLAGIARIZED FROM TRIPTYCH PAPER]]] Let $\mathbb{G}$ be a cyclic group of prime order $l > 3$ in which the discrete logarithm problem is hard and the decisional Diffie-Hellman assumption and inverse decisional Diffie-Hellman assumption hold, and let $\mathbb{Z}_l$ be its scalar field. Let $\mathcal{H}: [0,1]^* \to \mathbb{Z}_l$ be a cryptographic hash function. We add a subscript to $\mathcal{H}$, such as $\mathcal{H}_1$, in lieu of domain-separating the hash function explicitly; any domain-separation method may be used in practice (e.g.\ an ASCII string corresponding to a domain-separated use case, such as $\mathcal{H}(``sender\_receiver\_secret",[\textrm{hash input}])$).
 
-Let each of the following sets contain generators of $\mathbb{G}$, where each generator's discrete logarithm with respect to other generators in the same set is unknown (there may be intersections between sets): $[G, H, U]$, $[G_0, G_1,...,G_n]$, $[H_0, H_1,...,H_m]$, $[X]$ (for arbitrary integers $n$, $m$). Note that all such generators may be produced using public randomness. For example, the use of a hash function with domain separation may be appropriate. All public parameters are assumed to comprise a global reference string known to all players. For readability, we generally exclude explicit reference to public parameters in algorithm definitions and Fiat-Shamir transcript hashes.
+Let each of the following sets contain generators of $\mathbb{G}$, where each generator's discrete logarithm with respect to other generators in the same set is unknown (there may be intersections between sets): $\{G, H, U\}$, $\{G_0, G_1,...,G_n\}$, $\{H_0, H_1,...,H_m\}$, $\{X\}$ (for arbitrary integers $n$, $m$). Note that all such generators may be produced using public randomness. For example, the use of a hash function with domain separation may be appropriate. All public parameters are assumed to comprise a global reference string known to all players. For readability, we generally exclude explicit reference to public parameters in algorithm definitions and Fiat-Shamir transcript hashes.
 
 
 \subsection{Notation}
@@ -152,7 +152,7 @@ Let each of the following sets contain generators of $\mathbb{G}$, where each ge
 \section{Seraphis}
 \label{sec:seraphis}
 
-In this section we discuss the various components of Seraphis, with security theorems and proofs introduced where appropriate. Seraphis is an {\em abstract} protocol, so various implementation details are left undefined. In particular, an implementer needs to define the generators $G_0, G_1, H_0, H_1, X$ (see Section \ref{subsec:implementers-generators} for example), specify a membership proof structure (e.g.\ Appendix \ref{appendix:membership-with-grootle}), specify an unspentness/ownership proof structure (e.g.\ Appendix \ref{appendix:composition-with-schnorr}), and define how to check that transaction amounts balance (e.g.\ Section \ref{subsec:implementers-amount-balancing}).
+In this section we discuss the various components of Seraphis, with security theorems and proofs introduced where appropriate. Seraphis is an {\em abstract} protocol, so various implementation details are left undefined. In particular, an implementer needs to define the generators $G_0, G_1, H_0, H_1, X$ (see Section \ref{subsec:implementers-generators} for example), specify a membership proof structure (e.g.\ a Groth/Bootle one-of-many proof \cite{bootle-one-of-many, triptych-preprint, nwk-paper...}), specify an unspentness/ownership proof structure (e.g.\ Appendix \ref{appendix:composition-with-schnorr}), and define how to check that transaction amounts balance (e.g.\ Section \ref{subsec:implementers-amount-balancing}).
 
 
 \subsection{Transaction overview}
@@ -272,7 +272,7 @@ A proving system/structure is only eligible to be used as a Seraphis membership 
 
 In the context of Seraphis, we straightforwardly construct tuples $S$ directly from e-notes, which can be referenced with simple ledger indices for verifiers to find (in a naive implementation),\footnote{If the size of $\mathbb{S}$ is small, then it may be practical to reference e-notes with simple indices. As $\mathbb{S}$ gets large, more sophisticated data-compression techniques are advisable to minimize transaction sizes. For example, deterministically selecting members of the anonymity set using public entropy and a hash function \cite{chator-green-how-to-squeeze-crowd}.} and tuples $\tilde{S}$ from e-note-images. Readers will note that a membership proof says nothing about how $K$ and $C$ are constructed (i.e.\ the values of $G_0,...$, $H_0,...$, etc.). In future sections we will add more constraints to guarantee that e-notes and e-note-images found in transactions have the expected forms (within a security parameter).
 
-A trivial proof that satisfies the above model would be a pair of signatures on commitments to zero $K' - K = t_k G_0$ and $C' - C = t_c H_0$, given a reference set $\mathbb{S}$ that contains only one tuple $[K, C]$. More interesting solutions include a CSAG (a CLSAG \cite{clsag-eprint} without linking) on a ring of such commitment to zero pairs (assuming $G_0 == H_0$), a Groth/Bootle \cite{...} one-of-many proof (see Appendix \ref{appendix:membership-with-grootle}) on a collection of those pairs, or a Groth/Bootle one-of-many proof applied to the squashed e-note model (see Appendix \ref{appendix:squashed-e-note-model}).
+A trivial proof that satisfies the above model would be a pair of signatures on commitments to zero $K' - K = t_k G_0$ and $C' - C = t_c H_0$, given a reference set $\mathbb{S}$ that contains only one tuple $[K, C]$. More interesting solutions include a CSAG (a CLSAG \cite{clsag-eprint} without linking) on a ring of such commitment to zero pairs (assuming $G_0 == H_0$), a Groth/Bootle one-of-many proof \cite{bootle-one-of-many, triptych-preprint, nwk-paper...} on a collection of those pairs, or a Groth/Bootle one-of-many proof applied to the squashed e-note model (see Appendix \ref{appendix:squashed-e-note-model}).
 
 
 \subsection{Ownership and unspentness proofs}
@@ -289,7 +289,7 @@ A proof structure is only eligible to be used for Seraphis ownership/unspentness
 
     \item Demonstrate that a key $\tilde{K}$ satisfies $\tilde{K} == (1/y)*X$.
 
-    \item An observer who knows none of $x, y, x G_0$ or $y G_1$ must be unable to derive $y G_1$ from the resulting proof.
+    \item An observer who knows none of $x, y$, or $x G_0$ must be unable to derive $y G_1$ from the resulting proof. If the observer knows $y G_1$, the proof cannot allow them to realize that $\tilde{K}$ is built from the same $y$ value.
 \end{enumerate}
 
 We can apply such a `composition' proof to Seraphis in the following way (see Appendix \ref{appendix:composition-with-schnorr} for an example proof structure that satisfies this model).
@@ -401,7 +401,7 @@ There are a number of details to consider when implementing Seraphis in a real c
 \subsection{Generators}
 \label{subsec:implementers-generators}
 
-For a concrete implementation of Seraphis, we recommend using three generators $G$, $H$, and $U$. Set $G_0 = H_0 = X = G$, $G_1 = U$, and $H_1 = H$.
+For a concrete implementation of Seraphis on group $\mathbb{G}$, we recommend using three generators $G$, $H$, and $U$, where $G$ is the `main' generator of $\mathbb{G}$ according to the relevant convention. Set $G_0 = H_0 = X = G$, $G_1 = U$, and $H_1 = H$.
 
 An e-note will look like this:
 
@@ -426,7 +426,7 @@ An e-note-image will look like this:
 For amount balance proofs (recall Section \ref{subsec:seraphis-amount-balance-proofs}), we recommend using $p = 0$. To achieve that, the sums of blinding factors must match between inputs and outputs. Perform the following steps before constructing any membership proofs for a transaction.
 
 \begin{enumerate}
-    \item Suppose a transaction spends $j \in 1,...,m$ old e-notes and creates $t \in 1,...,p$ new ones. Let the masked commitments in e-note-images be denoted $C'_j = v_{c,j} G + a_j H$. Let the commitments in new e-notes be denoted $C_t = y_t G + b_t H$.
+    \item Suppose a transaction spends $j \in 1,...,m$ old e-notes and creates $t \in 1,...,p$ new ones ($m$ here is a notation overload of the $m$ in generator $H_m$). Let the masked commitments in e-note-images be denoted $C'_j = v_{c,j} G + a_j H$. Let the commitments in new e-notes be denoted $C_t = y_t G + b_t H$.
 
     \item For $j \in 1,...,m-1$, randomly select $v_{c,j} \in_R \mathbb{Z}_l$. For $t \in 1,...,p$, randomly select $y_t \in_R \mathbb{Z}_l$.
 
@@ -814,5 +814,7 @@ The above recommendations are not an exhaustive list. Here are some other ideas 
 - sample implementation
     - squashed vs non-squashed
     - aggregate CSAG \& multibase/multikey signature for ownership/unspent proofs across all inputs
-    - Grootle 1-of-many for membership proofs (or Triptych+ style?)
+    - Grootle 1-of-many for membership proofs
+        - squashed: plain
+        - non-squashed: parallel (from Triptych paper)
     - Bulletproofs+ range proofs

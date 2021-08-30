@@ -123,13 +123,6 @@ Observe the following.
 
 
 
-\section{Membership proofs with Grootle}
-\label{appendix:membership-with-grootle}
-
-- Groth/Bootle (Grootle) (parallel vs non-parallel)
-
-
-
 \section{Composition proofs with Schnorr}
 \label{appendix:composition-with-schnorr}
 
@@ -156,27 +149,30 @@ In this Appendix is our recommended approach to satisfying the Seraphis ownershi
     \item Demonstrate the discrete log of $K_{t2} = (x/y)*G_0$ with respect to $G_0$.
 \end{enumerate}
 
+\subsubsection{Seraphis requirements satisfaction}
+
+[[[explain how it satisfies the requirements?]]]
 
 \subsection{Composition proof structure}
 \label{appendix:composition-proof-structure}
 
 [[[better terminology than `proof structure'?]
 
-Our proof structure is a sigma protocol between prover and verifier. Notably, for the discrete log of $K_{t2}$ from the proof system, we use the concise approach exposed in \cite{clsag-eprint} to reduce proof sizes (i.e.\ reduce the number of responses required).
+Our proof structure is a Schnorr-like $\Sigma$-protocol between prover and verifier. Notably, for the discrete log of $K_{t2}$ from the proof system, we use the concise approach from \cite{clsag-eprint} to reduce proof sizes when constructing multiple proofs in parallel (i.e.\ reduce the number of responses required).
 
 \begin{enumerate}
     \item Suppose the prover has keys $[x_i, y_i, K_i]$ for $i \in 1,...,n$, where $K_i = x_i G_0 + y_i G_1$.
 
     \item The prover generates random scalars $\alpha_0, \alpha_1, ..., \alpha_n \in_R \mathbb{Z}_l$.
 
-    \item The prover computes $\alpha_0 G_0$, and $\alpha_i K$, $\alpha_i X$, $K_i$, $K_{t1,i} = (x_i/y_i)*G_0$, and $\tilde{K}_i = (1/y_i)*X$ for $i \in 1,...n$. He sends all of those to the verifier along with the keys $K_i$.
+    \item The prover computes $\alpha_0 G_0$, and $\alpha_i K$, $\alpha_i X$, $K_{t1,i} = (x_i/y_i)*G_0$, and $\tilde{K}_i = (1/y_i)*X$ for $i \in 1,...n$. He sends all of those to the verifier along with the keys $K_i$.
 
     \item The verifier generates a random challenge $c \in_R \mathbb{Z}_l$ and sends it to the verifier.
 
     \item The prover computes responses $r_0, r_1, ..., r_n$ and sends them to the verifier.\vspace{.115cm}
     \begin{align*}
-        r_0 &= \alpha_0 - c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(x_i/y_i)) \\
-        r_i &= \alpha_i - c*(1/y_i)
+        r_0 &\equiv \alpha_0 - c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(x_i/y_i)) \\
+        r_i &\equiv \alpha_i - c*(1/y_i)
     \end{align*}
 
     \item The verifier checks the following equalities. If any of them fail, then the prover has failed to satisfy the composition proof system.\vspace{.115cm}
@@ -200,19 +196,19 @@ Here we apply the Fiat-Shamir transform \cite{fiat-shamir-transform} to the proo
 
     \item The prover generates random scalars $\alpha_0, \alpha_1, ..., \alpha_n \in_R \mathbb{Z}_l$.
 
-    \item The prover computes $\alpha_0 G_0$, and $\alpha_i K$, $\alpha_i X$, $K_i$, $\tilde{K}_i = (1/y_i)*X$, and $K_{t1,i} = (x_i/y_i)*G_0$ for $i \in 1,...n$.
+    \item The prover computes $\alpha_0 G_0$, and $\alpha_i K$, $\alpha_i X$, $\tilde{K}_i = (1/y_i)*X$, and $K_{t1,i} = (x_i/y_i)*G_0$ for $i \in 1,...n$. Let the values $G_0, G_1, X, K_i, K_{t1,i}$, and $\tilde{K}_i$ be recorded in a global reference string $R$.
 
     \item The prover computes the challenge:
-    \[c = \mathcal{H}_8([\alpha_0 G_0], [\alpha_1 K_1], [\alpha_1 X],...,[\alpha_n K_n], [\alpha_n X])\]
+    \[c = \mathcal{H}_8(R, [\alpha_0 G_0], [\alpha_1 K_1], [\alpha_1 X],...,[\alpha_n K_n], [\alpha_n X])\]
 
     \item The prover computes responses $r_0, r_1, ..., r_n$.\vspace{.115cm}
     \begin{align*}
-        r_0 &= \alpha_0 - c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(x_i/y_i)) \\
-        r_i &= \alpha_i - c*(1/y_i)
+        r_0 &\equiv \alpha_0 - c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(x_i/y_i)) \\
+        r_i &\equiv \alpha_i - c*(1/y_i)
     \end{align*}
 \end{enumerate}
 
-The composition proof is the tuple $\sigma_{cp} = [c, r_0, r_1, ..., r_n, K_1, ..., K_n, K_{t1,1}, ..., K_{t1,n}, \tilde{K}_1, ..., \tilde{K}_n]$.
+The composition proof is the tuple $\sigma_{cp} = [c, r_0, r_1, ..., r_n, G_0, G_1, X, K_1, K_{t1,1}, \tilde{K}_1, ..., K_n, K_{t1,n}, \tilde{K}_n]$.
 
 \subsubsection{Verification}
 
@@ -221,7 +217,7 @@ The verifier does the following given a proof $\sigma_{cp}$.
 \begin{enumerate}
     \item Compute the challenge:
     \begin{align*}
-        c' = \mathcal{H}_8(&[r_0 G_0 + c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(K_{t1,i} - G_1))],\\
+        c' = \mathcal{H}_8(&R, [r_0 G_0 + c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(K_{t1,i} - G_1))],\\
         &[r_1 K_1 + c*K_{t1,1}], [r_1 X + c*\tilde{K}_1],...,[r_n K_n + c*K_{t1,n}], [r_n X + c*\tilde{K}_n])
     \end{align*}
     \[\]
