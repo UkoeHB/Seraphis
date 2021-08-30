@@ -123,36 +123,110 @@ Observe the following.
 
 
 
-\section{Groth/Bootle one-of-many proofs}
-\label{appendix:grootle-one-of-many-proofs}
+\section{Membership proofs with Grootle}
+\label{appendix:membership-with-grootle}
 
-- Grootle (parallel vs non-parallel)
+- Groth/Bootle (Grootle) (parallel vs non-parallel)
 
 
 
-\section{Generalized Schnorr signatures}
-\label{appendix:generalized-schnorr-signatures}
+\section{Composition proofs with Schnorr}
+\label{appendix:composition-with-schnorr}
 
-- generalized Schnorr signature
-    - signing with multiple private keys in parallel (shared challenge)
-    - concise aggregation on common base points (compressing private keys)
-    - multi-base signing (same DL across multiple bases)
+In this Appendix is our recommended approach to satisfying the Seraphis ownership/unspentness proof requirements (Section \ref{subsec:seraphis-ownership-unspentness-proofs}). First we lay out the proof system that satisfies those requirements, next we will describe a proof structure in that system, and finally we will apply the Fiat-Shamir transform \cite{fiat-shamir-transform} to that structure.
 
-Application of these concepts to Seraphis ownership/unspentness proofs...
+
+\subsection{Composition proof system}
+\label{appendix:composition-proof-system}
+
+[[[better terminology than `proof system'?]]]
 
 \begin{enumerate}
-    \item Assume there is a group point $K = x G + y U$.
+    \item Assume there is a group point $K = x G_0 + y G_1$.
 
     \item Let\vspace{.115cm}
     \begin{align*}
-        \tilde{K} &= (1/y)*G \\
         K_{t1} &= (1/y)*K \\
-        K_{t2} &= K_{t1} - U
+        \tilde{K} &= (1/y)*X \\
+        K_{t2} &= K_{t1} - G_1
     \end{align*}
 
-    \item Demonstrate the simultaneous discrete log of $K_{t1}$ and $\tilde{K}$ with respect to $K$ and $G$. A simultaneous discrete log proof shows knowledge of a single scalar that is the discrete log between two pairs of group elements (in this case $(1/y)$). [[[formalize better?]]]
+    \item Demonstrate the simultaneous discrete log of $K_{t1}$ and $\tilde{K}$ with respect to $K$ and $X$. A simultaneous discrete log proof shows knowledge of a single scalar that is the discrete log between two pairs of group elements (in this case $(1/y)$). [[[formalize better?]]]
 
-    \item Demonstrate the discrete log of $K_{t2} = (x/y)*G$ with respect to $G$.
+    \item Demonstrate the discrete log of $K_{t2} = (x/y)*G_0$ with respect to $G_0$.
+\end{enumerate}
+
+
+\subsection{Composition proof structure}
+\label{appendix:composition-proof-structure}
+
+[[[better terminology than `proof structure'?]
+
+Our proof structure is a sigma protocol between prover and verifier. Notably, for the discrete log of $K_{t2}$ from the proof system, we use the concise approach exposed in \cite{clsag-eprint} to reduce proof sizes (i.e.\ reduce the number of responses required).
+
+\begin{enumerate}
+    \item Suppose the prover has keys $[x_i, y_i, K_i]$ for $i \in 1,...,n$, where $K_i = x_i G_0 + y_i G_1$.
+
+    \item The prover generates random scalars $\alpha_0, \alpha_1, ..., \alpha_n \in_R \mathbb{Z}_l$.
+
+    \item The prover computes $\alpha_0 G_0$, and $\alpha_i K$, $\alpha_i X$, $K_i$, $K_{t1,i} = (x_i/y_i)*G_0$, and $\tilde{K}_i = (1/y_i)*X$ for $i \in 1,...n$. He sends all of those to the verifier along with the keys $K_i$.
+
+    \item The verifier generates a random challenge $c \in_R \mathbb{Z}_l$ and sends it to the verifier.
+
+    \item The prover computes responses $r_0, r_1, ..., r_n$ and sends them to the verifier.\vspace{.115cm}
+    \begin{align*}
+        r_0 &= \alpha_0 - c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(x_i/y_i)) \\
+        r_i &= \alpha_i - c*(1/y_i)
+    \end{align*}
+
+    \item The verifier checks the following equalities. If any of them fail, then the prover has failed to satisfy the composition proof system.\vspace{.115cm}
+    \begin{align*}
+        \alpha_0 G_0 &== r_0 G_0 + c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(K_{t1,i} - G_1)) \\
+        \alpha_i K_i &== r_i K_i + c*K_{t1,i} \\
+        \alpha_i X   &== r_i X + c*\tilde{K}_i
+    \end{align*}
+\end{enumerate}
+
+
+\subsection{Non-interactive composition proofs}
+\label{appendix:noninteractive-composition-proofs}
+
+Here we apply the Fiat-Shamir transform \cite{fiat-shamir-transform} to the proof structure just described.
+
+\subsubsection{Non-interactive proof}
+
+\begin{enumerate}
+    \item Suppose the prover has keys $x_i, y_i$, and $K_i$ for $i \in 1,...,n$, where $K_i = x_i G_0 + y_i G_1$.
+
+    \item The prover generates random scalars $\alpha_0, \alpha_1, ..., \alpha_n \in_R \mathbb{Z}_l$.
+
+    \item The prover computes $\alpha_0 G_0$, and $\alpha_i K$, $\alpha_i X$, $K_i$, $\tilde{K}_i = (1/y_i)*X$, and $K_{t1,i} = (x_i/y_i)*G_0$ for $i \in 1,...n$.
+
+    \item The prover computes the challenge:
+    \[c = \mathcal{H}_8([\alpha_0 G_0], [\alpha_1 K_1], [\alpha_1 X],...,[\alpha_n K_n], [\alpha_n X])\]
+
+    \item The prover computes responses $r_0, r_1, ..., r_n$.\vspace{.115cm}
+    \begin{align*}
+        r_0 &= \alpha_0 - c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(x_i/y_i)) \\
+        r_i &= \alpha_i - c*(1/y_i)
+    \end{align*}
+\end{enumerate}
+
+The composition proof is the tuple $\sigma_{cp} = [c, r_0, r_1, ..., r_n, K_1, ..., K_n, K_{t1,1}, ..., K_{t1,n}, \tilde{K}_1, ..., \tilde{K}_n]$.
+
+\subsubsection{Verification}
+
+The verifier does the following given a proof $\sigma_{cp}$.
+
+\begin{enumerate}
+    \item Compute the challenge:
+    \begin{align*}
+        c' = \mathcal{H}_8(&[r_0 G_0 + c*(\sum^n_{i=1} \mathcal{H}_7(i, K_1,...,K_n)*(K_{t1,i} - G_1))],\\
+        &[r_1 K_1 + c*K_{t1,1}], [r_1 X + c*\tilde{K}_1],...,[r_n K_n + c*K_{t1,n}], [r_n X + c*\tilde{K}_n])
+    \end{align*}
+    \[\]
+
+    \item If $c == c'$ then the proof is valid.
 \end{enumerate}
 
 
