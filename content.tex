@@ -189,7 +189,7 @@ Seraphis e-notes are composed of an amount commitment, an address, and a memo.
     \item \textbf{Address}: A public key $K^o$ composed of two generators $G_0$ and $G_1$, and two corresponding private keys $k^o_b$ and $k^o_a$. The e-note's owner must prove knowledge of those private keys if they want to transfer the amount $a$ to new e-notes.\footnote{The slightly awkward notation of e-note addresses $K^o = k^o_b*G_0 + k^o_a*G_1$ is meant to be compatible with the CryptoNote \cite{cryptoNoteWhitePaper} tradition, where $a$ indicates a so-called `view key', and $b$ indicates a `spend key'. Our intention should become more clear in Sections \ref{subsec:seraphis-address-model}, \ref{subsec:implementers-generators}, and \ref{subsec:implementers-addressing-schemes}.}\footnote{Seraphis could be made even more generic by allowing $K^o$ to be more open-ended, i.e.\ $K^o = k^o_0*G_0 + k^o_1*G_1 + ... + k^o_n*G_n$. It is only for the sake of simplicity that we did not go down that road. The extension to generic $K^o$s (and even generic amount commitments, with multiple blinding factors on different generators) is trivial and does not change any of the security proofs/etc.\ discussed in this section.}\vspace{.115cm}
     \[K^o = k^o_b*G_0 + k^o_a*G_1\]
 
-    \item \textbf{Memo}: An arbitrary memo field. This usually includes information that helps the e-note's owner identify that they own it, learn the private keys $k^o_a$ and $k^o_b$, and reconstruct the amount commitment. See Section \ref{subsec:implementers-information-recovery}.
+    \item \textbf{Memo}: An arbitrary memo field. This usually includes information that helps the e-note's owner identify that they own it, learn the private keys $k^o_a$ and $k^o_b$, and reconstruct the amount commitment. See Sections \ref{subsec:seraphis-information-recovery} and \ref{subsec:implementers-information-recovery}.
 \end{itemize}
 
 
@@ -370,7 +370,7 @@ Instead, we recommend the following e-note address model inspired by CryptoNote 
     \end{align*}
 \end{enumerate}
 
-E-note recipients must learn $k_{a, sender}$ in order to spend their e-notes. We discuss that topic in Section \ref{subsec:implementers-information-recovery}.
+E-note recipients must learn $k_{a, sender}$ in order to spend their e-notes. We discuss that topic in Sections \ref{subsec:seraphis-information-recovery} and \ref{subsec:implementers-information-recovery}.
 
 \textbf{Comments}
 
@@ -383,12 +383,42 @@ E-note recipients must learn $k_{a, sender}$ in order to spend their e-notes. We
 
     \item In the context of transaction protocols, multisignature schemes allow a group of N participants to `co-own' e-notes (see \cite{MRL-0009-multisig} for example). Only a collaborating subgroup of participants of size M (M $<=$ N) may spend any e-note. This is called `M-of-N multisig'.
 
-    Ideally, multisig schemes allow all participants to view the group's balance (amount of money currently owned). In Seraphis, this means being able to identify all owned e-notes (see Section \ref{subsec:implementers-information-recovery}) and recreate all the corresponding linking tags to check if they have been spent.
+    Ideally, multisig schemes allow all participants to view the group's balance (amount of money currently owned). In Seraphis, this means being able to identify all owned e-notes (see Section \ref{subsec:seraphis-information-recovery}) and recreate all the corresponding linking tags to check if they have been spent.
 
     Conveniently, the distinction between $k_{a, recipient}$ and $k_{b, recipient}$ makes our addressing model very `multisig-friendly'. If all multisig participants have full knowledge of $k_{a, recipient}$, then they can easily recompute all linking tags to identify spent e-notes, and can identify newly acquired e-notes and recover their amounts with the method described in Section \ref{subsec:implementers-information-recovery}. Meanwhile, $k_{b, recipient}$ can be divided among participants so proving ownership (Section \ref{subsec:seraphis-ownership-unspentness-proofs}) requires a collaborating subgroup of size M.
 
     With, for example, the construction in Appendix \ref{appendix:composition-with-schnorr}, proving knowledge of $k_{b, recipient}$ only requires a discrete-log proof between $K_{t2}$ and $G$, where $K_{t2} = (x/y)*G = ((t_k + k_{b, recipient})/(k_{a, sender} + k_{a, recipient}))*G$. For multisig, this can be achieved with a simple thresholded Schnorr signature (e.g.\ \cite{...}), assuming $t_k$, $k_{a, sender}$, and $k_{a, recipient}$ are known by all M co-signers.
 \end{itemize}
+
+
+\subsection{Information recovery}
+\label{subsec:seraphis-information-recovery}
+
+E-note owners need to discover the e-notes they own in the ledger, read the amounts in those e-notes, reconstruct commitments in order to create balance proofs for new transactions, and learn the sender keys $k_{a,sender}$ so they can construct linking tags.
+
+A Seraphis-compatible information-recovery scheme must satisfy the following requirements.
+
+\begin{enumerate}
+    \item Any user who has a pair of private keys $[k_{a,recipient}, k_{b,recipient}]$, or a proxy of that user, should be able to use information stored in the ledger to acquire the following `nominal' secrets corresponding to each e-note in the ledger.
+
+    \begin{itemize}
+        \item \textbf{Sender secret}: $k^{nom}_{a,sender}$
+        \item \textbf{Amount}: $a^{nom}$
+        \item \textbf{Amount commitment blinding factor}: $x^{nom}$
+    \end{itemize}
+
+    \item The user is considered an e-note's owner if the following two tests succeed (using the values $K^o$ and $C$ recorded in the e-note).\vspace{.115cm}
+    \begin{align*}
+        K^o &\stackrel{?}{=} k_{b,recipient} G_0 + (k^{nom}_{a,sender} + k_{a,recipient})*G_1 \\
+        C &\stackrel{?}{=} x^{nom} H_0 + a^{nom} H_1
+    \end{align*}
+
+    \item An observer who knows none of the keys in the tuple $[k_{a,sender}, k_{a,recipient}, k_{b,recipient}]$ must be unable to succeed at the first equality test. If  they don't know any of the keys in the tuple $[x, k_{a,sender}$ then they must not succeed at the second equality test. Furthermore, any observer who fails the first equality test must not be able to guess with probability better than random chance that $K^o$ is constructed from a composition between $k_{a,sender} G_1$ and $k_{b,recipient} G_0 + k_{a,recipient} G_1$. In other words, even though it is trivial to compute $k_{a,sender} G_1 = K^o - k_{b,recipient} G_0 + k_{a,recipient} G_1$, the observer cannot guess with probability better than random chance that the discrete log of $k_{a,sender} G_1$ with respect to $G_1$ is known to the e-note's owner. [[[This point feels a bit shaky - I want to say that anonymity can't be broken by observers, i.e.\ that observers can't identify the recipient of an e-note nor the amount involved]]]
+\end{enumerate}
+
+We present a concrete approach in Section \ref{subsec:implementers-information-recovery} based on a Diffie-Hellman shared secret between sender and receiver.
+
+An implementation of this section and the Seraphis address model is `unverifiable'. It isn't possible for a transaction verifier to know if a transaction's author has in fact followed these recommendations. Instead, these sections can be enforced by user choice. If, in practice, a user only creates transactions using a transaction-builder implementation that satisfies all Seraphis requirements, then the privacy model we laid out will be achieved for that user (with some caveats around `fingerprinting' if there are multiple implementations with different semantic conventions --- see Section \ref{subsec:implementers-other-recommendations}).
 
 
 
@@ -503,28 +533,10 @@ Transaction fees must be incorporated into amount balances. Verifiers can use th
 \end{enumerate}
 
 
-\subsection{Non-prime groups}
-\label{subsec:implementers-non-prime-groups}
-
-This paper requires $\mathbb{G}$ to be a prime group, however in practice it may be implemented as a prime subgroup of a non-prime group. One prominent example, used in CryptoNote \cite{cryptoNoteWhitePaper} and its progeny, is the elliptic curve Ed25519 \cite{Bernstein2012-high-speed-high-security-ed25519}, which has order $8*l$ ($l$ is a prime number $\approx 2^{252}$). CryptoNote e-notes and proofs are designed to only use curve points from the subgroup of size $l$.
-
-All uses of curve points in an implementation of Seraphis based on a non-prime group must take into account the possibility that a point recorded in a transaction may not be in the prime subgroup.
-
-In particular, linking tags recorded in e-note-images {\em must} be points in the prime subgroup \cite{key-image-bug}, since checking if a linking tag has appeared in the ledger usually involves a byte-wise lookup. There are several ways to ensure non-prime points are detected by transaction validators. From least to most efficient, they are:
-
-\begin{itemize}
-    \item Test $l*\tilde{K} \stackrel{?}{=} I$, where $I$ is the curve's identity element.
-
-    \item Let the linking tag recorded in e-note-images (and the ledger) be $\tilde{K}_{record} = (1/h)*\tilde{K}$, where $h$ is the curve's cofactor (8 in the case of Ed25519). To validate a transaction, compute $\tilde{K} = h*\tilde{K}_{record}$ before verifying the composition proof from Section \ref{subsec:seraphis-ownership-unspentness-proofs}.
-
-    \item Use an encoding abstraction such as Ristretto \cite{ristretto} to ensure that all points recorded in a transaction (in e-notes, e-note-images, and proof elements) are in the prime subgroup.\footnote{A Ristretto point will fail to decompress into a full elliptic curve point if it is not in the prime subgroup.}
-\end{itemize}
-
-
-\subsection{Information recovery}
+\subsection{Information recovery in practice}
 \label{subsec:implementers-information-recovery}
 
-How can e-note owners discover the e-notes they own, read the amounts in those e-notes, reconstruct commitments in order to perform balance proofs in new transactions, and learn the sender keys $k_{a,sender}$ so they can construct linking tags?
+As discussed in Section \ref{subsec:seraphis-information-recovery}, e-note owners would like to discover the e-notes they own, read the amounts in those e-notes, reconstruct commitments in order to perform balance proofs in new transactions, and learn the sender keys $k_{a,sender}$ so they can construct linking tags.
 
 The answer first pioneered by CryptoNote \cite{cryptoNoteWhitePaper} for privacy-focused transaction protocols revolves around a Diffie-Hellman shared secret between the sender and receiver of an e-note.
 
@@ -579,9 +591,9 @@ The answer first pioneered by CryptoNote \cite{cryptoNoteWhitePaper} for privacy
 \textbf{Comments}
 
 \begin{itemize}
-    \item Basing information recovery on a Diffie-Hellman exchange between sender and recipient ensures $k_{a,sender}$, $y_t$, and $enc\_amount_t$ will be unknown to observers (within a security factor).
+    \item Basing information recovery on a Diffie-Hellman exchange between sender and recipient ensures $k_{a,sender}$, $y_t$, and $enc\_amount_t$ will be unknown to observers (within a security factor). This approach trivially satisfies the requirements in Section \ref{subsec:seraphis-information-recovery}.
 
-    \item Since $q_t$ is computed from the `view-received' key $k^{vr}$, only $k^{vr}$ and $K^s$ are required in order to view owned e-notes (important in Section \ref{subsec:implementers-addressing-schemes}).
+    \item Since $q_t$ is computed from the `view-received' key $k^{vr}$, only $k^{vr}$ and $K^s$ are required in order to view owned e-notes (important in Section \ref{subsec:implementers-addressing-schemes}). A person who knows only $k^{vr}$ and $K^s$ can be considered a `proxy' of the true address holder (e-note owner), and hence this approach does not violate the requirements in Section \ref{subsec:seraphis-information-recovery}.
 
     \item Commitment blinding factors $y_t$ and the sender key $k_{a,sender,t}$ are created in the random oracle model, instead of being generated randomly. [[[justify better?]]]
 
@@ -771,6 +783,24 @@ Take the previous adjustment and add the following rules.
 
     \item Let the spend key be $K^s = k^{vo} U + k^s G$.
 \end{enumerate}
+
+
+\subsection{Non-prime groups}
+\label{subsec:implementers-non-prime-groups}
+
+This paper requires $\mathbb{G}$ to be a prime group, however in practice it may be implemented as a prime subgroup of a non-prime group. One prominent example, used in CryptoNote \cite{cryptoNoteWhitePaper} and its progeny, is the elliptic curve Ed25519 \cite{Bernstein2012-high-speed-high-security-ed25519}, which has order $8*l$ ($l$ is a prime number $\approx 2^{252}$). CryptoNote e-notes and proofs are designed to only use curve points from the subgroup of size $l$.
+
+All uses of curve points in an implementation of Seraphis based on a non-prime group must take into account the possibility that a point recorded in a transaction may not be in the prime subgroup.
+
+In particular, linking tags recorded in e-note-images {\em must} be points in the prime subgroup \cite{key-image-bug}, since checking if a linking tag has appeared in the ledger usually involves a byte-wise lookup. There are several ways to ensure non-prime points are detected by transaction validators. From least to most efficient, they are:
+
+\begin{itemize}
+    \item Test $l*\tilde{K} \stackrel{?}{=} I$, where $I$ is the group's identity element.
+
+    \item Let the linking tag recorded in e-note-images (and the ledger) be $\tilde{K}_{record} = (1/h)*\tilde{K}$, where $h$ is the curve's cofactor (8 in the case of Ed25519). To validate a transaction, compute $\tilde{K} = h*\tilde{K}_{record}$ before verifying the composition proof from Section \ref{subsec:seraphis-ownership-unspentness-proofs}.
+
+    \item Use an encoding abstraction such as Ristretto \cite{ristretto} to ensure that all points recorded in a transaction (in e-notes, e-note-images, and proof elements) are in the prime subgroup.\footnote{A Ristretto point will fail to decompress into a full elliptic curve point if it is not in the prime subgroup.}
+\end{itemize}
 
 
 \subsection{Other recommendations}
