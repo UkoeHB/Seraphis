@@ -117,7 +117,7 @@ This separation allows the definition of linking tags to be fairly open-ended. W
 
 In Appendix \ref{appendix:squashed-e-note-model-model} we introduce a more-restrictive membership proof model layered on the primary model in this paper. We call it the `squashed e-note' model. Concrete proving structures in that model are non-trivially more efficient than structures in the plain model, allowing relatively larger anonymity set sizes as a function of proof complexity and size compared to structures in the plain model, when comparing structures based on the same proving systems.
 
-Also note that Seraphis permits `transaction chaining', where it is possible to construct a transaction B that spends an e-note from transaction A before A has been added to the ledger (Section~\ref{subsec:implementers-other-recommendations}), and `membership proof delegation', where constructing a membership proof is delegated to a third party without revealing any wallet private keys (also Section~\ref{subsec:implementers-other-recommendations}). Combining these yields `transaction chaining by delegation', where the author of transaction B authorizes the transfer of funds from an e-note that doesn't exist in the chain, then gives their partial transaction (without a membership proof) to the author of transaction A (which creates that e-note), who can complete transaction B and submit it after they have completed and submitted transaction A.\footnote{Transaction chaining by delegation gets even more interesting if combined with something like Monero's lock-time. A Monero transaction author can define the earliest blockchain height where the new e-notes they create can be spent. Suppose transaction B spends an e-note that doesn't exist in the ledger (blockchain) {\em and} an e-note with a lock-time in the near future, then author B delegates completing the transaction to author A. Author A cannot submit transaction B until that locked e-note can be spent. If they submit transaction A right away, then there will be a period of time where the e-note it creates can't be spent by transaction B. Author B could make another transaction B' in that time that spends the e-note. We leave the application of these ideas to a useful protocol as an exercise for the reader.}
+Also note that Seraphis permits `transaction chaining', where it is possible to construct a transaction B that spends an e-note from transaction A before A has been added to the ledger (Section~\ref{subsec:implementers-modular-tx-building}), and `membership proof delegation', where constructing a membership proof is delegated to a third party without revealing any wallet private keys (also Section~\ref{subsec:implementers-modular-tx-building}). Combining these yields `transaction chaining by delegation', where the author of transaction B authorizes the transfer of funds from an e-note that doesn't exist in the chain, then gives their partial transaction (without a membership proof) to the author of transaction A (which creates that e-note), who can complete transaction B and submit it after they have completed and submitted transaction A.
 
 
 
@@ -152,7 +152,7 @@ Let each of the following sets contain generators of $\mathbb{G}$, where each ge
 \section{Seraphis}
 \label{sec:seraphis}
 
-In this section we discuss the various components of Seraphis, with security theorems and proofs introduced where appropriate. Seraphis is an {\em abstract} protocol, so various implementation details are left undefined. In particular, an implementer needs to define the generators $G_0, G_1, H_0, H_1, X$ (see Section \ref{subsec:implementers-generators} for example), specify a membership proof structure (e.g.\ a Groth/Bootle one-of-many proof \cite{bootle-one-of-many, triptych-preprint, nwk-paper...}), specify an unspentness/ownership proof structure (e.g.\ Appendix \ref{appendix:composition-with-schnorr}), and define how to check that transaction amounts balance (e.g.\ Section \ref{subsec:implementers-amount-balancing}).
+In this section we discuss the various components of Seraphis, with security theorems and proofs introduced where appropriate. Seraphis is an {\em abstract} protocol, so various implementation details are left undefined. An implementer needs to define the generators $G_0, G_1, H_0, H_1, X$ (see Section \ref{subsec:implementers-generators} for example), specify a membership proof structure (e.g.\ a Groth/Bootle one-of-many proof \cite{bootle-one-of-many, triptych-preprint, nwk-paper...}), specify an unspentness/ownership proof structure (e.g.\ Appendix \ref{appendix:composition-with-schnorr}), define how to check that transaction amounts balance (e.g.\ Section \ref{subsec:implementers-amount-balancing}), define an address scheme (e.g.\ Section \ref{subsec:implementers-addressing-schemes}, and define an information recovery scheme (e.g.\ Section \ref{subsec:implementers-information-recovery}.
 
 
 \subsection{Transaction overview}
@@ -805,6 +805,48 @@ In particular, linking tags recorded in e-note-images {\em must} be points in th
 \end{itemize}
 
 
+\subsection{Modular transaction building}
+\label{subsec:implementers-modular-tx-building}
+
+Seraphis, like other transaction protocols inspired by RingCT, does not include any advanced `scripting' capabilities such as those found in Bitcoin. However, a Seraphis implementation can be designed to permit relatively more `modular' transaction building compared to RingCT and other protocols. A modular design enables `membership proof delegation', `transaction chaining', and `collaborative funding'.
+
+\begin{itemize}
+    \item Membership proof delegation means allowing a third party to construct an arbitrary e-note's membership proof.
+
+    \item Transaction chaining is the ability to construct a transaction B that spends an e-note produced by transaction A, before A has been added to the ledger.
+
+    \item Collaborative funding allows arbitrary individuals to contribute funds (inputs) to a transaction with pre-determined outputs. This can be useful for permissionless floodgate fundraising, where people donate to a cause (i.e.\ sign e-notes to be spent by a transaction) but the donations are only `final' when the cause is fully funded (i.e.\ when the transaction has enough inputs to be submitted to the blockchain).
+\end{itemize}
+
+Each of those techniques are enabled by the following transaction-building procedure.
+
+\begin{enumerate}
+    \item Define the transaction's output e-notes.
+
+    \item Construct ownership/unspentness proofs for each input's e-note-image. Each of these should sign a message containing the relevant e-note-image (but not the other inputs' e-note-images), and all of the transaction's outputs. Cache the values $t_c$ and $t_k$ for each input.
+
+    \begin{itemize}
+        \item Ownership/unspentness proofs should not sign the transaction fee, if there is one. This way the fee of a collaboratively funded transaction does not need to be determined in advance.
+
+        \item This design disallows `merged' ownership/unspentness proof structures, where all input e-note-images are proven legitimate at the same time. Implementers can use a merged proof if doing so is preferred over the capability for collaborative funding. In that case, the merged proof should sign all e-note-images and the transaction fee.
+    \end{itemize}
+
+    \item Construct a balance proof for the transaction.
+
+    \begin{itemize}
+        \item If doing collaborative funding, the individual who performs a balance proof must know the blinding factors and amounts of all input e-note-images and output e-notes.
+        
+        \item If doing collaborative funding and the amount balancing approach from Section \ref{subsec:implementers-amount-balancing} is used, then the balance proof creator must add an input to the transaction with an e-note-image commitment blinding factor that equals the sum of output commitment blinding factors minus the sum of other e-note-image commitments' blinding factors. Note that this input is well-suited to `filling in the gaps' of a collaboratively funded transaction where input amounts don't exactly equal output amounts (plus the intended transaction fee).
+    \end{itemize}
+
+    \item Construct range proofs for all of the output e-notes' amount commitments (and for the input e-note-images' masked commitments if using the squashed e-note model [Appendix \ref{appendix:squashed-e-note-model}]).
+
+    \item Construct a membership proof for each input using the cached $t_c$ and $t_k$ values.\footnote{It may be desirable for $t_{c,j}$ and $t_{k,j}$ to be deterministic, such as $t_{c,j} = \mathcal{H}_c(k^{vr}, k^{vs}, K^o_j, C_j)$ and $t_{k,j} = \mathcal{H}_k(k^{vr}, k^{vs}, K^o_j, C_j)$. This way, for example, a tier 2 wallet could construct membership proofs independently of a tier 3 wallet that focuses on constructing/signing ownership/unspentness proofs. However, since we recommend defining $t_{c,m}$ as a function of a transaction's output e-notes (Section \ref{subsec:implementers-amount-balancing}), that approach is not feasible (or at least not completely reliable). If an implementer wants deterministic $t_{c,j}$ and $t_{k,j}$, then they should use a DL proof on the commitment to zero $\sum C'_j - \sum C_t = p G$ to satisfy the Seraphis balance proof requirement instead of relying on a balance between blinding factors. We did not recommend that approach because it requires storing an extra proof in transaction data, and requires more computational effort on the part of transaction verifiers. Note that there is one edge case where using deterministic blinding factors is flawed. Since deterministic blinding factors are fixed for each e-note, they will stay the same between transaction attempts. If creating a membership proof is delegated to a third party (i.e.\ they are given the values $t_{c,j}$, $t_{k,j}$, $C_j$, $K^o_j$) for one transaction attempt, but that attempt is aborted, then that third party will be able to recognize when the e-note is spent in a different transaction attempt even if a different person creates the e-note's membership proof.} Membership proofs should not sign any transaction material other than material directly related to the membership proof (e.g.\ the relevant e-note-image, and ledger references to the e-notes referenced by the proof). Membership proofs and ownership/unspentness proofs should not share any Fiat-Shamir challenges.
+\end{enumerate}
+
+Since constructing membership proofs only requires the values $t_{c,j}$, $t_{k,j}$, $C_j$, $K^o_j$, proof delegation is trivial. Transaction chaining is possible because the first four steps can be executed even if the inputs being spent don't exist in the ledger. A transaction can be collaboratively funded if step two is executed by independent parties, since step two requires no cooperation between input signers.
+
+
 \subsection{Other recommendations}
 \label{subsec:implementers-other-recommendations}
 
@@ -822,20 +864,6 @@ The above recommendations are not an exhaustive list. Here are some other ideas 
     \item \textbf{View tag optimization}: To identify an owned e-note, multiple group operations are required (Section \ref{subsec:implementers-information-recovery}). Typically, group operations are quite expensive, so the amount of time it takes to scan the ledger for owned e-notes is a function of how many group operations are executed.
 
     One possible optimization is to include the first one byte of the value $q_t$ in e-note memos as a so-called `view tag' \cite{reduce-scan-times-view-tag-research-issue-73}. Before trying to compute $K^{s,nominal}_t = K^o_t - \mathcal{H}_2(q^{nom}_t)*U$ for a given e-note, users can first compute the view tag and check if it matches the value recorded in the e-note. If it does not match, then the step to get $K^{s,nominal}_t$ can be skipped.
-
-    \item \textbf{Transaction chaining}: Seraphis, like other transaction protocols inspired by RingCT, does not include any advanced `scripting' capabilities such as those found in Bitcoin. This means transactions can only be constructed in limited scenarios. However, unlike RingCT and other protocols, a Seraphis implementation can be designed to permit `transaction chaining', which is beneficial for atomic swap protocols \cite{atomic-swaps-paper} (among other techniques).
-
-    Transaction chaining is the ability to construct a transaction B that spends an e-note produced by transaction A, before A has been added to the ledger. For Seraphis to support transaction chaining, the following approach can be used.
-
-    \begin{enumerate}
-        \item The ownership/unspentness proof structure should be independent from membership proofs. This means membership proof material should not be signed by the ownership/unspentness proof structure, and the two proof structures should not share any Fiat-Shamir challenges.
-
-        \item When constructing a transaction, first construct a `partial transaction'. This partial transaction contains everything {\em except} the inputs' membership proofs. The values $t_{c,j}$ and $t_{k,j}$ should be cached alongside the partial transaction.
-
-        \item When you want to finish a partial transaction, use the cached $t_{c,j}$ and $t_{k,j}$ values to construct membership proofs.\footnote{It may be desirable for $t_{c,j}$ and $t_{k,j}$ to be deterministic, such as $t_{c,j} = \mathcal{H}_c(k^{vr}, k^{vs}, K^o_j, C_j)$ and $t_{k,j} = \mathcal{H}_k(k^{vr}, k^{vs}, K^o_j, C_j)$. This way, for example, a tier 2 wallet could construct membership proofs independently of a tier 3 wallet that focuses on constructing/signing ownership/unspentness proofs. However, since we recommend defining $t_{c,m}$ as a function of a transaction's output e-notes (Section \ref{subsec:implementers-amount-balancing}), that approach is not feasible (or at least not completely reliable). If an implementer wants deterministic $t_{c,j}$ and $t_{k,j}$, then they should generate $t_{c,m}$ randomly and use a DL proof on the commitment to zero $\sum C'_j - \sum C_t = p G$ to satisfy the Seraphis balance proof requirement. We did not recommend that approach because it requires storing an extra proof in transaction data, and requires more computational effort on the part of transaction verifiers. Note that there is one edge case where using deterministic blinding factors is flawed. Since deterministic blinding factors are fixed for each e-note, they will stay the same between transaction attempts. If creating a membership proof is delegated to a third party (i.e.\ they are given the values $t_{c,j}$, $t_{k,j}$, $C_j$, $K^o_j$) for one transaction attempt, but that attempt is aborted, then that third party will be able to recognize when the e-note is spent in a different transaction attempt even if a different person creates the e-note's membership proof.}
-    \end{enumerate}
-
-    Taking this approach permits transaction chaining because the second step can be executed even if the inputs being spent don't exist in the ledger. Moreover, the third step can be easily offloaded to a third party. Knowledge of the values $t_{c,j}$ and $t_{k,j}$ only allows you to identify the true spends in membership proofs, which is presumably acceptable in any situation where transaction chaining is desired.
 \end{itemize}
 
 
