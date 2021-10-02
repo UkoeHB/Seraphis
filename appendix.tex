@@ -108,7 +108,7 @@ Observe the following.
 \section{Composition proofs with Schnorr}
 \label{appendix:composition-with-schnorr}
 
-In this Appendix is one approach to satisfying the Seraphis ownership/unspentness proof requirements (Section \ref{subsec:seraphis-ownership-unspentness-proofs}), assuming $J == G_2$. First we lay out the proof system that satisfies those requirements, next we will describe a proof structure in that system, and finally we will apply the Fiat-Shamir transform \cite{fiat-shamir-transform} to that structure.
+In this Appendix is one approach to satisfying the Seraphis ownership/unspentness proof requirements (Section \ref{subsec:seraphis-ownership-unspentness-proofs}), assuming $J == G_2$. First we lay out the proof system that satisfies those requirements, then we describe a proof structure in that system.\footnote{We leave applying the Fiat-Shamir transform \cite{fiat-shamir-transform} to the composition proof structure as an exercise for the reader.}
 
 
 \subsection{Composition proof system}
@@ -119,7 +119,7 @@ In this Appendix is one approach to satisfying the Seraphis ownership/unspentnes
 \begin{enumerate}
     \item Assume there is a group point $K = x G_0 + y G_1 + z G_2$.
 
-    \item Let\vspace{.115cm}
+    \item Let
     \begin{align*}
         K_{t1} &= (1/y)*K \\
         \tilde{K} &= (z/y)*G_2 \\
@@ -137,12 +137,15 @@ In this Appendix is one approach to satisfying the Seraphis ownership/unspentnes
 
 [[[explain how it satisfies the requirements?]]]
 
+
 \subsection{Composition proof structure}
 \label{appendix:composition-proof-structure}
 
 [[[better terminology than `proof structure'?]
 
-Our proof structure is a Schnorr-like $\Sigma$-protocol between prover and verifier. Notably, for the discrete logs of $\tilde{K}$ and $K_{t2}$ from the proof system, we use the concise approach from \cite{clsag-eprint} to reduce proof sizes when constructing multiple proofs in parallel (i.e.\ reduce the number of responses required).
+Our proof structure is a Schnorr-like $\Sigma$-protocol between prover and verifier. Notably, for the discrete logs of $\tilde{K}$ and $K_{t2}$ from the proof system, we use the concise approach from \cite{clsag-eprint} to reduce proof sizes when constructing multiple proofs in parallel (i.e.\ reduce the number of responses required). Furthermore, we use the powers-of-$\mu$ approach from \cite{triptych-preprint} (i.e.\ `aggregation coefficients'), instead of distinct per-element hashes, for simplicity.
+
+Note that if a composition proof is made for one input keyset, then the proof structure degenerates into a plain tuple of Schnorr proofs (i.e.\ the aggregation coefficients become irrelevant, since $\mu^0 = 1$).
 
 \begin{enumerate}
     \item Suppose the prover has keys $[x_i, y_i, z_i, K_i]$ for $i \in 1,...,n$, where $K_i = x_i G_0 + y_i G_1 + z_i G_2$.
@@ -151,64 +154,21 @@ Our proof structure is a Schnorr-like $\Sigma$-protocol between prover and verif
 
     \item The prover computes $\alpha_a G_0$, $\alpha_b G_2$, $\alpha_i K_i$, $K_{t1,i} = (1/y_i)*K_i$, and $\tilde{K}_i = (z_i/y_i)*G_2$ for $i \in 1,...n$. He sends all of those to the verifier along with the keys $K_i$.
 
-    \item The verifier generates a random challenge $c \in_R \mathbb{Z}_l$ and sends it to the verifier.
+    \item The verifier generates random scalars $c, \mu_a, \mu_b \in_R \mathbb{Z}_l$ and sends them to the prover.
 
     \item The prover computes responses $r_a, r_b, r_1, ..., r_n$ and sends them to the verifier.\vspace{.115cm}
     \begin{align*}
-        r_a &\equiv \alpha_a - c*(\sum^n_{i=1} \mathcal{H}_7(\textrm{``a"}, i, K_{t2,1},...,K_{t2,n})*(x_i/y_i)) \\
-        r_b &\equiv \alpha_b - c*(\sum^n_{i=1} \mathcal{H}_7(\textrm{``b"}, i, \tilde{K}_1,...,\tilde{K}_n)*(z_i/y_i)) \\
+        r_a &\equiv \alpha_a - c*(\sum^n_{i=1} \mu_a^{i-1}*(x_i/y_i)) \\
+        r_b &\equiv \alpha_b - c*(\sum^n_{i=1} \mu_b^{i-1}*(z_i/y_i)) \\
         r_i &\equiv \alpha_i - c*(1/y_i)
     \end{align*}
 
-    \item The verifier computes $K_{t2,i} = K_{t1,i} - G_1 - \tilde{K}_i$, then checks the following equalities. If any of them fail, then the prover has failed to satisfy the composition proof system.\vspace{.115cm}
+    \item The verifier computes $K_{t2,i} = K_{t1,i} - G_1 - \tilde{K}_i$, then checks the following equalities. If any of them fail (or any of $K_i, K_{t1,i}, \tilde{K}_i$ equal the identity element $I$), then the prover has failed to satisfy the composition proof system.\vspace{.115cm}
     \begin{align*}
-        \alpha_a G_0 &== r_a G_0 + c*(\sum^n_{i=1} \mathcal{H}_7(\textrm{``a"}, i, K_{t2,1},...,K_{t2,n})*K_{t2,i}) \\
-        \alpha_b G_2 &== r_b G_2 + c*(\sum^n_{i=1} \mathcal{H}_7(\textrm{``b"}, i, \tilde{K}_1,...,\tilde{K}_n)*\tilde{K}_i) \\
+        \alpha_a G_0 &== r_a G_0 + c*(\sum^n_{i=1} \mu_a^{i-1}*K_{t2,i}) \\
+        \alpha_b G_2 &== r_b G_2 + c*(\sum^n_{i=1} \mu_b^{i-1}*\tilde{K}_i) \\
         \alpha_i K_i &== r_i K_i + c*K_{t1,i}
     \end{align*}
-\end{enumerate}
-
-
-\subsection{Non-interactive composition proofs}
-\label{appendix:noninteractive-composition-proofs}
-
-Here we apply the Fiat-Shamir transform \cite{fiat-shamir-transform} to the proof structure just described.
-
-\subsubsection{Non-interactive proof}
-
-\begin{enumerate}
-    \item Suppose the prover has keys $x_i, y_i, z_i$, and $K_i$ for $i \in 1,...,n$, where $K_i = x_i G_0 + y_i G_1 + z_i G_2$.
-
-    \item The prover generates random scalars $\alpha_a, \alpha_b, \alpha_1, ..., \alpha_n \in_R \mathbb{Z}_l$.
-
-    \item The prover computes $\alpha_a G_0$, $\alpha_b G_2$, $\alpha_i K_i$, $K_{t1,i} = (1/y_i)*K_i$, and $\tilde{K}_i = (z_i/y_i)*G_2$ for $i \in 1,...n$. Let the values $G_0, G_1, G_2, K_i, K_{t1,i}$, and $\tilde{K}_i$ be recorded in a global reference string $R$.
-
-    \item The prover computes the challenge:
-    \[c = \mathcal{H}_8(R, [\alpha_a G_0], [\alpha_b G_2], [\alpha_1 K_1],...,[\alpha_n K_n])\]
-
-    \item The prover computes responses $r_a, r_b, r_1, ..., r_n$.\vspace{.115cm}
-    \begin{align*}
-        r_a &\equiv \alpha_a - c*(\sum^n_{i=1} \mathcal{H}_7(\textrm{``a"}, i, K_{t2,1},...,K_{t2,n})*(x_i/y_i)) \\
-        r_b &\equiv \alpha_b - c*(\sum^n_{i=1} \mathcal{H}_7(\textrm{``b"}, i, \tilde{K}_1,...,\tilde{K}_n)*(z_i/y_i)) \\
-        r_i &\equiv \alpha_i - c*(1/y_i)
-    \end{align*}
-\end{enumerate}
-
-The composition proof is the tuple $\sigma_{cp} = [c, r_a, r_b, r_1, ..., r_n, G_0, G_1, G_2, K_1, K_{t1,1}, \tilde{K}_1, ..., K_n, K_{t1,n}, \tilde{K}_n]$.
-
-\subsubsection{Verification}
-
-The verifier does the following given a proof $\sigma_{cp}$.
-
-\begin{enumerate}
-    \item Compute the challenge:
-    \begin{align*}
-        c' = \mathcal{H}_8(R, &[r_a G_0 + c*(\sum^n_{i=1} \mathcal{H}_7(\textrm{``a"}, i, K_{t2,1},...,K_{t2,n})*K_{t2,i})],\\
-        &[r_b G_2 + c*(\sum^n_{i=1} \mathcal{H}_7(\textrm{``b"}, i, \tilde{K}_1,...,\tilde{K}_n)*\tilde{K}_i)],\\
-        &[r_1 K_1 + c*K_{t1,1}],...,[r_n K_n + c*K_{t1,n}])
-    \end{align*}
-
-    \item If $c == c'$ then the proof is valid.
 \end{enumerate}
 
 \end{appendices}

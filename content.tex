@@ -289,7 +289,7 @@ A proof structure is only eligible to be used for Seraphis ownership/unspentness
 \begin{enumerate}
     \item Assume there is a group point $K = x G_0 + y G_1 + z G_2$.
 
-    \item Demonstrate knowledge of values $x, y, z$ such that $K = x G_0 + y G_1 + z G_2$ and $y/z \neq 0$.
+    \item Demonstrate knowledge of values $x, y, z$ such that $K = x G_0 + y G_1 + z G_2$ and $y, z/y \neq 0$.
 
     \item Demonstrate that a key $\tilde{K}$ satisfies $\tilde{K} == (z/y)*J$.
 
@@ -389,7 +389,7 @@ In practice, these `intentions' can be implemented with the following general ru
 
 We do not require transaction fees to be committed to by e-note authors (they only need to be committed to it in balance proofs). This facilitates dynamic collaborative funding (see Section \ref{subsec:implementers-modular-tx-building}), where the fee can be undetermined when contributing an input to a transaction.
 
-From a teleological perspective, we do not consider this problematic. If an e-note owner does not construct a transaction's balance proof, then they must delegate that ability to another party. We consider that delegation to count as delegation of the authority to decide transaction fees.
+From a teleological perspective, we do not consider this problematic. If an e-note owner does not construct a transaction's balance proof, then they must delegate that ability to another party. We consider balance proof delegation to count as delegation of the authority to decide transaction fees.
 
 
 \subsection{E-note address model}
@@ -533,7 +533,7 @@ There are two problems to consider.
 
     Even if the amount isn't unusual, if the anonymity set size of membership proofs is relatively small, then there is a very low probability that the observer's e-note was randomly selected as a decoy and just happened to have the same amount as the real e-note being spent.
 
-    \item If $v_{c,1}$ is used as a secret input to a proof (e.g.\ a discrete log proof of the commitment to zero $C' - C$ with respect to $G$), then the observer may be able to guess and check the proof structure to see if $v_{c,1} = [\sum^{p}_{t=1} y_t]$ is in fact that secret input (depending on the proof structure used).
+    \item If $v_{c,1}$ is used as a secret input to a proof (e.g.\ a discrete log proof of the commitment to zero $C' - C$ with respect to $G$), then the observer may be able to guess and check the proof structure to see if $v_{c,1} = [\sum^{p}_{t=1} y_t]$ is in fact that secret input (depending on the proof structure used).\footnote{For examples of where this can be a problem, CLSAG \cite{clsag-eprint} and Triptych \cite{triptych-preprint} both require keys (`extra' key images) computed like $t_c P$ (where $P$ is public information). This means if the observer knows the input commitment blinding factor (and all output commitment blinding factors), then they can identify the true spend of a 1-input transaction via guess-and-check.}
 \end{enumerate}
 
 Both problems are mitigated or solved by including a `change e-note' in each transaction, even if its amount must be zero.\footnote{There are niche cases where the first problem is unsolvable. For example, the sender could allow a `low bit' fingerprint to propagate from an input to an output. The observer may also be able to infer, by the mere fact an e-note he created was referenced by a membership proof, that his e-note is being spent.} A change e-note is an e-note the transaction author sends to himself if the total output amount of their transaction exceeds the amount they intend to send to other people (unavoidable if no combination of owned e-notes' amounts equals the intended total output amount of their transaction).
