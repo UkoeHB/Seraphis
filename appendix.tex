@@ -16,7 +16,7 @@ First we will describe the model, then discuss how it satisfies relevant securit
 \label{appendix:squashed-e-note-model-model}
 
 \begin{enumerate}
-    \item Let $G_0 = H_0$, and assume the discrete logarithm of $H_1$ with respect to any of $G_1,...,G_n$ is unknown.
+    \item Require $G_0 = H_0$, and assume the discrete logarithm of $H_1$ with respect to any of $G_1,...,G_n$ is unknown (in addition to all the other assumptions from Section \ref{subsec:preliminaries-public-parameters}).
 
     \item Let $\mathbb{S}$ represent a set of tuples $[K_i, C_i]$, where\vspace{.115cm}
     \begin{align*}
@@ -63,7 +63,7 @@ The benefit of this specialization compared to the underlying membership proof m
 
 We argue that the squashed e-note model satisfies the underlying membership proof model.
 
-Let $\mathbb{S}^t$ be the input to the underlying model. We will show that the following requirements, adapted from Section \ref{subsec:seraphis-membership proofs}, are met.
+Let $\mathbb{S}^t$ be the input to the underlying model. We will show that the following requirement, adapted from Section \ref{subsec:seraphis-membership proofs}, is met.
 
 \begin{enumerate}
     \item Demonstrate that, within a security parameter $k$, $\tilde{S}$ corresponds to some $S^t_{\pi} \in \mathbb{S}^t$, where $\pi$ is unknown to the verifier, such that:
@@ -76,17 +76,17 @@ Let $\mathbb{S}^t$ be the input to the underlying model. We will show that the f
 Observe the following.
 
 \begin{enumerate}
-    \item The prover must know $[(z' + x') - (\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]$ and $z'$ to satisfy the squashed e-note model, and $x'$ and $x_{\pi}$ to construct the range proofs on $C'$ and $C^t_{\pi}$. Therefore the prover must know $\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi}$. The point $\mathcal{H}_6(K_{\pi}, C_{\pi})$ is considered `public knowledge', so the prover must also know $z_{\pi}$.
+    \item The prover must know $[(z' + x') - (\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]$ and $z'$ to satisfy the squashed e-note model, and $x'$ and $x_{\pi}$ to construct the range proofs on $C'$ and $C^t_{\pi}$. Therefore the prover must know $\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi}$. The point $\mathcal{H}_6(K_{\pi}, C_{\pi})$ is considered `public knowledge', so the prover must also know $z_{\pi}$ (which may be 0).
 
-    \item Range proofing $C_{\pi}$ and $C'$ means they have the form $x H_0 + a H_1$, implying they contain no $G_1,...,G_n$ components. Therefore, demonstrating discrete log with respect to $G_0$ in the commitment to zero $\tilde{Q} - Q_{\pi}$ means it must be the case that $s'_j == \mathcal{H}_6(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$.
+    \item Range proofing $C_{\pi}$ and $C'$ means they have the form $x H_0 + a H_1$, implying they contain no $G_1,...,G_n$ components. Therefore, demonstrating discrete log with respect to $G_0$ in the commitment to zero $\tilde{Q} - Q_{\pi}$ means it must be the case that $s'_j == \mathcal{H}_6(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$ (i.e.\ all factors of $G_1,...,G_n$ in $\tilde{Q}$ and $K'$ must come from $K_{\pi}$).
 
-    \item Suppose $K_i$ has the form $K_i = z_i G_0 + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n + e H_1$. Since the model demonstrates that $K'$ does not contain any $H_1$ components, and the commitment to zero $\tilde{Q} - Q_{\pi}$ means all non-$G_0$ components balance in those two points, it must be the case that $C' = x' H_0 + (a_{i,1} + \mathcal{H}_6(K_{\pi}, C_{\pi})*e)*H_1$. However, the term $\mathcal{H}_6(K_{\pi}, C_{\pi})$ is both uniformly distributed and implicitly dependent on the values $a_{i,1}$ and $e$, so the value $a'_1 = (a_{i,1} + \mathcal{H}_6(K_{\pi}, C_{\pi})*e)$ will be uniformly distributed in $\mathbb{Z}_l$ (assuming $e$ is non-zero). Since the range proof on $C'$ means that $a'_1$ must be in the range $[0,...,2^z - 1]$, if $e \neq 0$ then the probability that a range proof on $a'_1$ can succeed is $2^z/l$. This means $a'_1 == a_{i,1}$ can be assumed to be true within the security parameter $k$ if $1/k > 2^z/l$.\footnote{Typically $l \approx 2^{252} - 2^{256}$, $2^z = 2^{64}$, and $k = 2^{128}$; $1/2^{128} > 2^{64}/2^{252}$ is true.} [[[formalize better?]]]
+    \item Suppose $K_i$ has the form $K_i = z_i G_0 + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n + e H_1$. Since the model requires a demonstration that $K'$ does not contain any $H_1$ components, and the commitment to zero $\tilde{Q} - Q_{\pi}$ means all non-$G_0$ components balance in those two points, it must be the case that $C' = x' H_0 + (a_{i,1} + \mathcal{H}_6(K_{\pi}, C_{\pi})*e)*H_1$. However, the term $\mathcal{H}_6(K_{\pi}, C_{\pi})$ is both uniformly distributed and implicitly dependent on the values $a_{i,1}$ and $e$, so the value $a'_1 = (a_{i,1} + \mathcal{H}_6(K_{\pi}, C_{\pi})*e)$ will be uniformly distributed in $\mathbb{Z}_l$ (assuming $e$ is non-zero). Since the range proof on $C'$ means that $a'_1$ must be in the range $[0,...,2^z - 1]$, if $e \neq 0$ then the probability that a range proof on $a'_1$ can succeed is $2^z/l$. This means $a'_1 == a_{i,1}$ can be assumed to be true within the security parameter $k$ if $1/k > 2^z/l$.\footnote{Typically $l \approx 2^{252} - 2^{256}$, $2^z = 2^{64}$, and $k = 2^{128}$; $1/2^{128} > 2^{64}/2^{252}$ is true.} [[[formalize better?]]]
 \end{enumerate}
 
 \subsubsection{Seraphis structure}
 
 \begin{enumerate}
-    \item Note that a range proof on $C_i$ is equivalent to a range proof on $C^t_i$ since $C^t_i = C_i$.
+    \item Note that a range proof on $C_i$ is equivalent to a range proof on $C^t_i$, since $C^t_i = C_i$. These range proofs will already exist, since membership proofs only reference e-notes in the ledger (which were created by transactions whose output e-notes' amount commitments were range proofed, or are coinbase e-notes whose amounts are known).
 
     \item Seraphis linking tags are computed from the output of a membership proof, namely the point $K'$ in $\tilde{S}$. However, $K'$ in the squashed e-note model applied to Seraphis has the form $K' = t_k G_0 + \mathcal{H}_6(K^o_{\pi}, C_{\pi})*[k^o_a*G_1 + k^o_b*G_2]$. This means linking tags will have the form $\tilde{K} = ((\mathcal{H}_6(K^o_{\pi}, C_{\pi})*k^o_b)/(\mathcal{H}_6(K^o_{\pi}, C_{\pi})*k^o_a))*X$. Since the terms $\mathcal{H}_6(K^o_{\pi}, C_{\pi})$ cancel each other, linking tags in this model are the same as in the base model.
 
@@ -145,7 +145,7 @@ In this Appendix is one approach to satisfying the Seraphis ownership/unspentnes
 
 Our proof structure is a Schnorr-like $\Sigma$-protocol between prover and verifier. Notably, for the discrete logs of $\tilde{K}$ and $K_{t2}$ from the proof system, we use the concise approach from \cite{clsag-eprint} to reduce proof sizes when constructing multiple proofs in parallel (i.e.\ reduce the number of responses required). Furthermore, we use the powers-of-$\mu$ approach from \cite{triptych-preprint} (i.e.\ `aggregation coefficients'), instead of distinct per-element hashes, for simplicity.
 
-Note that if a composition proof is made for one input keyset, then the proof structure degenerates into a plain tuple of Schnorr proofs (i.e.\ the aggregation coefficients become irrelevant, since $\mu^0 = 1$).
+Note that if a composition proof is made for one input keyset ($n = 1$), then the proof structure degenerates into a plain tuple of Schnorr proofs (i.e.\ the aggregation coefficients disappear, since $\mu^0 = 1$).
 
 \begin{enumerate}
     \item Suppose the prover has keys $[x_i, y_i, z_i, K_i]$ for $i \in 1,...,n$, where $K_i = x_i G_0 + y_i G_1 + z_i G_2$.
@@ -163,7 +163,7 @@ Note that if a composition proof is made for one input keyset, then the proof st
         r_i &\equiv \alpha_i - c*(1/y_i)
     \end{align*}
 
-    \item The verifier computes $K_{t2,i} = K_{t1,i} - G_1 - \tilde{K}_i$, then checks the following equalities. If any of them fail (or any of $K_i, K_{t1,i}, \tilde{K}_i$ equal the identity element $I$), then the prover has failed to satisfy the composition proof system.\vspace{.115cm}
+    \item The verifier computes $K_{t2,i} = K_{t1,i} - G_1 - \tilde{K}_i$, then checks the following equalities. If any of them fail (or if $K_{t1,i}$ or $\tilde{K}_i$ equal the identity element $I$), then the prover has failed to satisfy the composition proof system.\vspace{.115cm}
     \begin{align*}
         \alpha_a G_0 &== r_a G_0 + c*(\sum^n_{i=1} \mu_a^{i-1}*K_{t2,i}) \\
         \alpha_b G_2 &== r_b G_2 + c*(\sum^n_{i=1} \mu_b^{i-1}*\tilde{K}_i) \\

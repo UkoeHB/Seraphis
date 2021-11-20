@@ -128,11 +128,18 @@
 
 % Advanced tables
 \usepackage{ltablex}
+\usepackage{ragged2e}
+
+% add tabularx column type to prevent bad spacing when text wraps in a cell
+\newcolumntype{R}{>{\RaggedRight\arraybackslash}X}
 
 % Figure and Table reference numbering to be ChapterNum-FigNum
 % Doesn't work for trees (yet?) so trees should be called Trees/Diagrams instead of Figures
-\renewcommand\thetable{\thechapter-\arabic{table}}
-\renewcommand\thefigure{\thechapter-\arabic{figure}}
+\renewcommand\thetable{\thesection-\arabic{table}}
+\renewcommand\thefigure{\thesection-\arabic{figure}}
+
+% captions for figures
+\usepackage[labelfont=bf]{caption}
 
 % Line numbering for drafts only
 %\usepackage[pagewise,modulo,displaymath,mathlines]{lineno}
@@ -152,7 +159,7 @@
 
 
 \title{Seraphis: A Privacy-Preserving Transaction Protocol Abstraction (WIP)\footnote{\textbf{License}: Seraphis is released into the public domain.}\\\vspace{.3cm}
-\large Draft v0.0.13\footnote{This is just a draft, so it may not always be available wherever it is currently hosted.}\vspace{-.715cm}}
+\large Draft v0.0.15\footnote{This is just a draft, so it may not always be available wherever it is currently hosted.}\vspace{-.715cm}}
 \author{koe\footnote{Author `koe' worked on this document partly as an employee of MobileCoin, Inc.} \texttt{ ukoe@protonmail.com}}
 \date{\vspace{-.5cm}\today\vspace{-1cm}}
 
