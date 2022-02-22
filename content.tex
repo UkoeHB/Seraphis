@@ -643,7 +643,7 @@ The answer first pioneered by CryptoNote \cite{cryptoNoteWhitePaper} for privacy
         \item Decode the amount: $b_t = \textrm{\tt dec}[q^{nom}_t](enc\_amount_t)$.
         \item Compute the commitment blinding factor: $y_t = \mathcal{H}_3(q^{nom}_t)$.
         \item Verify that the e-note's commitment can be reconstructed: $y_t G + b_t H \stackrel{?}{=} C_t$. If not, then the e-note is malformed and can't be spent.
-        \item Compute the linking tag $\tilde{K}_t = (k_{b,recipient}/(q^{nom}_t + k_{a,recipient}))*U$. If there is a copy of $\tilde{K}_t$ in the ledger, then this e-note has already been spent.
+        \item Compute the linking tag $\tilde{K}_t = (k_{b,recipient}/(\mathcal{H}_2(q^{nom}_t) + k_{a,recipient}))*U$. If there is a copy of $\tilde{K}_t$ in the ledger, then this e-note has already been spent.
     \end{enumerate}
 \end{enumerate}
 
@@ -722,7 +722,7 @@ There are several details to take note of.
 
     An e-note can only be identified as `owned' if the user has a local record of the public spend key of the address that owns that e-note. In practice, users must pre-generate all subaddresses that might plausibly own an e-note (which can be done if you know $k^{vr}$, the normal address, and a list/range of plausible subaddress indices), and should only hand out subaddresses from that set for receipt of funds.
 
-    \item The view-spent private key $k^{vs}$, in combination with $q_t$ (computed using $k^{vr}$) and the key $k^s U$ (which can be derived from $k^s U = K^s - k^{vs} X)$, is required in order to compute linking tags: $\tilde{K}_t = (k^s/(q_t + k^{vs}))*U$.
+    \item The view-spent private key $k^{vs}$, in combination with $q_t$ (computed using $k^{vr}$) and the key $k^s U$ (which can be derived from $k^s U = K^s - k^{vs} X)$, is required in order to compute linking tags: $\tilde{K}_t = (k^s/(\mathcal{H}_2(q_t) + k^{vs}))*U$.
 
     \item The above two points mean users have access to three tiers of wallet permissions.
 
@@ -732,7 +732,7 @@ There are several details to take note of.
             \item \textbf{Requires}: $k^{vr}, K^s$
         \end{itemize}
 
-        \item \textbf{Balance recovery}: View received e-notes and identify which ones have been spent.\footnote{In an earlier version of this paper, linking tags had the form $\tilde{K}_t = (1/(q_t + k^{vs}))*G$. This meant a \textbf{balance recovery} (tier 2) wallet could demonstrate the discrete log of $\tilde{K}$ with respect to $G$. As a result, a tier-2 wallet holder could look at an e-note received to the underlying tier-3 wallet, extract the linking tag, send a new e-note to themselves with the same linking tag, then spend that e-note so the linking tag is added to the ledger. The original e-note seen by the tier-2 wallet would be unspendable (i.e.\ `burnt'). In other words, a tier-2 wallet would have the power to destroy outputs owned by a tier-3 wallet, which is sub-optimal (our thanks to Nikolas Kr{\"{a}}tzschmar for identifying this problem). The current linking tag construction $\tilde{K}_t = (k^s/(q_t + k^{vs}))*U$ prevents that issue by requiring knowledge of $k^s$ in order to demonstrate the linking tag's discrete log (with respect to generator $U$ in this case).}
+        \item \textbf{Balance recovery}: View received e-notes and identify which ones have been spent.\footnote{In an earlier version of this paper, linking tags had the form $\tilde{K}_t = (1/(\mathcal{H}_2(q_t) + k^{vs}))*G$. This meant a \textbf{balance recovery} (tier 2) wallet could demonstrate the discrete log of $\tilde{K}$ with respect to $G$. As a result, a tier-2 wallet holder could look at an e-note received to the underlying tier-3 wallet, extract the linking tag, send a new e-note to themselves with the same linking tag, then spend that e-note so the linking tag is added to the ledger. The original e-note seen by the tier-2 wallet would be unspendable (i.e.\ `burnt'). In other words, a tier-2 wallet would have the power to destroy outputs owned by a tier-3 wallet, which is sub-optimal (our thanks to Nikolas Kr{\"{a}}tzschmar for identifying this problem). The current linking tag construction $\tilde{K}_t = (k^s/(\mathcal{H}_2(q_t) + k^{vs}))*U$ prevents that issue by requiring knowledge of $k^s$ in order to demonstrate the linking tag's discrete log (with respect to generator $U$ in this case).}
         \begin{itemize}
             \item \textbf{Requires}: $k^{vr}, k^{vs}, K^s$
         \end{itemize}
@@ -936,7 +936,7 @@ In this section we discuss performance results (transaction sizes and verificati
 \subsection{Test details}
 \label{subsec:efficiency-test-details}
 
-Here is a brief overview of the transaction protocols tested, which were implemented on Ed25519~\cite{Bernstein2012-high-speed-high-security-ed25519} using a fork of the Monero codebase~\cite{seraphis-perf-branch}. All protocols use Confidential Transactions \cite{maxwell-ct-2}, so all mock-ups essentially had the same balance proof approach (with slight variations). Note that `Concise-Grootle' is simply a Triptych \cite{triptych-preprint} proof with the linking tag components removed and adapted to our membership proof model (Section \ref{subsec:seraphis-membership proofs}) instead of directly proving ownership of an e-note in the reference set.\footnote{`Grootle' refers to papers by Groth \cite{groth-one-out-of-many} and Bootle \cite{bootle-one-of-many}, which were precursors to Triptych \cite{triptych-preprint}. `Concise' refers to the use of $\mu_{\alpha}$ to reduce proof sizes in Triptych, which is in contrast to the `expanded' proof structure used by Lelantus-Spark \cite{lelantus-spark}.}
+Here is a brief overview of the transaction protocols tested, which were implemented on Ed25519~\cite{Bernstein2012-high-speed-high-security-ed25519} using a fork of the Monero codebase~\cite{seraphis-perf-branch}. All protocols use Confidential Transactions \cite{maxwell-ct-2}, so all mock-ups essentially had the same balance proof approach (with slight variations). Note that `Concise-Grootle' is simply a Triptych \cite{triptych-preprint} proof with the linking tag components removed and adapted to our membership proof model (Section \ref{subsec:seraphis-membership proofs}) instead of directly proving ownership of an e-note in the reference set. `Plain-Grootle' is very similar to `Concise-Grootle', but uses an expanded structure.\footnote{`Grootle' refers to papers by Groth \cite{groth-one-out-of-many} and Bootle \cite{bootle-one-of-many}, which were precursors to Triptych \cite{triptych-preprint}. `Concise' refers to the use of $\mu_{\alpha}$ to reduce proof sizes in Triptych, which is in contrast to the `expanded' proof structure used by Lelantus-Spark \cite{lelantus-spark} (`Plain-Grootle' in our case). Note that our Grootle proofs use the A/B optimization from Section 1.3 of this paper: \cite{matrict}.}
 
 \begin{tabularx}{\textwidth}{|R|R|R|R|}
 \caption{Transaction Protocols Overview}
@@ -948,20 +948,22 @@ Here is a brief overview of the transaction protocols tested, which were impleme
 \hline
     \textbf{Triptych} \cite{triptych-preprint} & Triptych & Triptych & A $p = 0$ balance check with aggregated Bulletproofs+ range proofs \cite{bulletproofs_plus} for output e-note amount commitments. \\
 \hline
-    \textbf{Seraphis-Concise} & Concise-Grootle & Seraphis composition proofs for each input image's masked address and linking tag (Appendix \ref{appendix:composition-with-schnorr}). & A $p > 0$ balance check\footnote{Seraphis-Concise and Seraphis-Squashed (the non-merged variants) use a $p > 0$ balance check to support collaborative funding (Section \ref{subsec:implementers-modular-tx-building}). Since $p = 0$ is slightly more efficient (by one scalar-mult-public-key elliptic curve operation, one group addition, and 32 bytes per transaction), $p = 0$ is used for the merged variant.} with aggregated Bulletproofs+ range proofs for output e-note amount commitments. \\
+    \textbf{Seraphis-Concise} & Concise-Grootle & Seraphis composition proofs for each input image's masked address and linking tag (Appendix \ref{appendix:composition-with-schnorr}). & A $p > 0$ balance check\footnote{Seraphis-Concise, Seraphis-Squashed, and Seraphis-Plain (the non-merged variants) use a $p > 0$ balance check to support collaborative funding (Section \ref{subsec:implementers-modular-tx-building}). Since $p = 0$ is slightly more efficient (by one scalar-mult-public-key elliptic curve operation, one group addition, and 32 bytes per transaction), $p = 0$ is used for the merged variant.} with aggregated Bulletproofs+ range proofs for output e-note amount commitments. \\
 \hline
     \textbf{Seraphis-Squashed} (Appendix \ref{appendix:squashed-e-note-model}) & Concise-Grootle on squashed e-notes. & Seraphis composition proofs for each input image's masked address and linking tag. & A $p > 0$ balance check with aggregated Bulletproofs+ range proofs for input image and output e-note amount commitments.  \\
 \hline
     \textbf{Seraphis-Merge} & Concise-Grootle & Aggregate Seraphis composition proof for all input images' masked addresses and linking tags. & A $p = 0$ balance check with aggregated Bulletproofs+ range proofs for output e-note amount commitments. \\
 \hline
+    \textbf{Seraphis-Plain} & Plain-Grootle & Seraphis composition proofs for each input image's masked address and linking tag. & A $p > 0$ balance check with aggregated Bulletproofs+ range proofs for output e-note amount commitments. \\
+\hline
 \end{tabularx}
 
-The test was run single-threaded on a {\tt zenith2alpha} motherboard with an AMD Ryzen Threadripper 3970X 32-Core processor and 256GB RAM. It was run on author koe's Seraphis performance test branch \cite{seraphis-perf-branch} at commit {\tt a63e39c6604d4ac493acee0f1c923dbefd50cca3}.\footnote{The test command was {\tt ./build/Linux/seraphis\_perf/release/tests/performance\_tests/performance\_tests --filter=\*mock\_tx\* --stats --loop-multiplier=10 --timings-database=/home/user/seraphis\_perf/test\_results/ perf\_run.txt > /home/user/seraphis\_perf/test\_results/stdout\_perf\_run.txt}.}
+The test was run single-threaded on a {\tt zenith2alpha} motherboard with an AMD Ryzen Threadripper 3970X 32-Core processor and 256GB RAM. It was run on author koe's Seraphis performance test branch \cite{seraphis-perf-branch} at commit {\tt ff4b862be0fbb5686067957628db401703fbfe19}.\footnote{The test command was {\tt ./build/Linux/seraphis\_perf/release/tests/performance\_tests/performance\_tests --filter=\*mock\_tx\* --stats --loop-multiplier=10 --timings-database=/home/user/seraphis\_perf/test\_results/ perf\_run.txt > /home/user/seraphis\_perf/test\_results/stdout\_perf\_run.txt}.}
 
 \subsection{Results and discussion}
 \label{subsec:efficiency-results-discussion}
 
-Here we discuss the test results. Note that, since Seraphis-Merge only materially differs from Seraphis-Concise in terms of transaction size as the number of transaction inputs changes, it is only seen in the plot of input count vs transaction size.
+Here we discuss the test results. Note that, since the only big difference between Seraphis-Merge and Seraphis-Concise is how transaction size changes as as the number of transaction inputs changes, Seraphis-Merge is only seen in the plot of input count vs transaction size.
 
 \begin{center}
     \includegraphics[width=8cm]{figures/refset_1batch_ver.png}
@@ -974,11 +976,13 @@ Here we discuss the test results. Note that, since Seraphis-Merge only materiall
 
 In Figure \ref{figure:efficiency-refsetsize-ver} we see that Seraphis-Concise and Triptych have practically identical verification costs. This is because the modifications to Triptych to get Concise-Grootle proofs have minimal effect on verification costs when reference sizes are reasonably large, and because Seraphis composition proofs have negligible verification cost compared to Concise-Grootle proofs.
 
-We also see that above reference set size 8, CLSAG performs significantly worse than Seraphis-Concise and Triptych. The performance costs of CLSAG for `large' reference set sizes (above around 5-15) is the driving motivator behind research into protocols like Triptych and Seraphis.
+Seraphis-Plain is only marginally faster than Seraphis-Concise (less than 10\%), because the verification optimizations that can be used by Seraphis-Plain are relatively inefficient.\footnote{For those readers familiar with Lelantus-Spark's Grootle proofs, we used 2-byte weights to aggregate keys during verification.}
+
+We also see that above reference set size 4, CLSAG performs significantly worse than Seraphis-Concise and Triptych. The performance costs of CLSAG for `large' reference set sizes (above around 5-15) is the driving motivator behind research into protocols like Triptych and Seraphis.
 
 It would seem that Seraphis-Squashed is unfavorable below a reference set size of 128, but Figures \ref{figure:efficiency-refsetsize-ver-25batch} and \ref{figure:efficiency-16inout-ver} will expose the advantages of that protocol variant.
 
-Figure \ref{figure:efficiency-refsetsize-size} further reinforces the costliness of CLSAG. It also reveals that Seraphis transaction sizes scale better than Triptych with reference set sizes, which is thanks to the relative simplicity of Concise-Grootle proofs.
+Figure \ref{figure:efficiency-refsetsize-size} further reinforces the costliness of CLSAG, and reveals that Seraphis transaction sizes scale better than Triptych with reference set sizes, which is thanks to the relative simplicity of Concise-Grootle proofs. Here we also see that the marginal performance gains of Seraphis-Plain compared to Seraphis-Concise come at a significant transaction size cost.
 
 \begin{center}
     \includegraphics[width=8cm]{figures/refset_25batch_ver.png}
@@ -989,9 +993,9 @@ Figure \ref{figure:efficiency-refsetsize-size} further reinforces the costliness
     \label{figure:efficiency-16inout-ver}
 \end{center}
 
-Figures \ref{figure:efficiency-refsetsize-ver-25batch} and \ref{figure:efficiency-16inout-ver} show what happens when transactions are verified in batches. Specifically, when the aggregated Bulletproofs+ range proofs in a transaction are batch-verified with range proofs from other equivalent transactions.
+Figures \ref{figure:efficiency-refsetsize-ver-25batch} and \ref{figure:efficiency-16inout-ver} show what happens when transactions are verified in batches. Multiple Grootle proofs can be verified together in batches, and likewise the aggregated Bulletproofs+ range proofs in a transaction can be batch-verified with range proofs from other equivalent transactions.
 
-Notably, Seraphis-Squashed's performance relative to the other protocols improves greatly when batching is done. This is because Seraphis-Squashed trades simpler membership proofs for range proofs on input image masked amount commitments. Since more of a Seraphis-Squashed transaction is batch-able than other protocols, it benefits more from batching.
+Notably, Seraphis-Squashed's performance relative to the other protocols improves greatly when batching is done. This is because Seraphis-Squashed trades simpler membership proofs for range proofs on input image masked amount commitments, and because Bulletproofs+ proofs benefit more from batching than Grootle proofs.\footnote{Grootle proof and Bulletproofs+ proof verification use so-called `multiexponentiation'. It turns out the multiexponentiation operations of those proofs can be combined into one operation, which is a slight optimization (on the order of 1-10\% for unbatched verification).}
 
 \begin{center}
     \includegraphics[width=8cm]{figures/inputs_size.png}
@@ -999,4 +1003,4 @@ Notably, Seraphis-Squashed's performance relative to the other protocols improve
     \label{figure:efficiency-inputs-size}
 \end{center}
 
-Finally, in Figure \ref{figure:efficiency-inputs-size} we see how Seraphis-Merge differs from the other variants. In explicit terms, Seraphis-Merge is $32*(1 + 3*(\textrm{num\_inputs} - 1))$ bytes smaller than Seraphis-Concise. Also note that Triptych transaction sizes scale worse with input counts than the Seraphis variants, since Triptych membership/ownership proofs are larger than Concise-Grootle + Seraphis composition proofs when the reference set size is 128 (Figure \ref{figure:efficiency-refsetsize-size} implies this result as well).
+Finally, in Figure \ref{figure:efficiency-inputs-size} we see how Seraphis-Merge differs from the other variants. In explicit terms, Seraphis-Merge is $32*(1 + 3*(\textrm{num\_inputs} - 1))$ bytes smaller than Seraphis-Concise. Also note that Triptych transaction sizes scale worse with input counts than the Seraphis variants. Even Seraphis-Plain scales better than Triptych with increasing input counts.

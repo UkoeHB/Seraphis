@@ -35,7 +35,7 @@ First we will describe the model, then discuss how it satisfies relevant securit
     \item Let $\mathbb{Q}$ represent a set of squashed tuples $[Q_i]$, where\vspace{.115cm}
     \[Q_i = K^t_i + C^t_i\]
 
-    \item Let $\tilde{S}$ represent a tuple $[K', C']$, where\vspace{.115cm}
+    \item Let $\tilde{S}$ represent a tuple $[K', C']$ (e.g.\ a masked version of $\mathbb{S}^t[\pi]$), where\vspace{.115cm}
     \begin{align*}
         K' &= z' G_0 + s'_1 G_1 + s'_2 G_2 + ... + s'_n G_n \\
         C' &= x' H_0 + a'_1 H_1
@@ -53,7 +53,7 @@ First we will describe the model, then discuss how it satisfies relevant securit
     \item Demonstrate knowledge of $z', s'_1,...,s'_n$ such that $K' = z' G_0 + s'_1 G_1 + s'_2 G_2 + ... + s'_n G_n$.
 \end{enumerate}
 
-The benefit of this specialization compared to the underlying membership proof model is you only need to prove the discrete log in one commitment to zero relation, rather than two. For example, with a SAG (e.g.\ LSAG \cite{Liu2004} without linking) or Groth/Bootle one-of-many proof on the set $\{\tilde{Q} - Q_i\}$. The efficiency implications are discussed in Section \ref{sec:efficiency}, which compares possible instantiations of Seraphis using the two models.
+The benefit of this specialization compared to the underlying membership proof model is you only need to prove the discrete log in one commitment to zero relation, rather than two. For example, with a SAG (e.g.\ LSAG \cite{Liu2004} without linking) or Groth/Bootle one-of-many proof on the set $\{\tilde{Q} - Q_i\}$.\footnote{In practice, it may be simpler to implement a membership proof on the equivalent set $\{Q_i - \tilde{Q}\}$.} The efficiency implications are discussed in Section \ref{sec:efficiency}, which compares possible instantiations of Seraphis using the two models.
 
 
 \subsection{Requirement satisfaction}
@@ -122,15 +122,15 @@ In this Appendix is one approach to satisfying the Seraphis ownership/unspentnes
     \item Let
     \begin{align*}
         K_{t1} &= (1/y)*K \\
-        \tilde{K} &= (z/y)*G_2 \\
-        K_{t2} &= K_{t1} - G_1 - \tilde{K}
+        K_{t2} &= K_{t1} - G_1 - \tilde{K} \\
+        \tilde{K} &= (z/y)*G_2
     \end{align*}
 
     \item Demonstrate the discrete log of $K_{t1} = (1/y)*K$ with respect to $K$.
 
-    \item Demonstrate the discrete log of $\tilde{K} = (z/y)*G_2$ with respect to $G_2$.
-
     \item Demonstrate the discrete log of $K_{t2} = (x/y)*G_0$ with respect to $G_0$.
+
+    \item Demonstrate the discrete log of $\tilde{K} = (z/y)*G_2$ with respect to $G_2$.
 \end{enumerate}
 
 \subsubsection{Seraphis requirements satisfaction}
