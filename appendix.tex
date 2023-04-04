@@ -4,117 +4,14 @@
 	\textcolor{red}{\small
 		\arabic{FancyVerbLine}}}
 
-\section{Squashed e-note model}
-\label{appendix:squashed-e-note-model}
-
-The squashed e-note model is a specialization of the Seraphis membership proof model that allows relatively simpler (and more efficient) proof structures.
-
-First we will describe the model, then discuss how it satisfies relevant security requirements when applied to Seraphis.
-
-
-\subsection{Model}
-\label{appendix:squashed-e-note-model-model}
-
-\begin{enumerate}
-    \item Require $G_0 = H_0$, and assume the discrete logarithm of $H_1$ with respect to any of $G_1,...,G_n$ is unknown (in addition to all the other assumptions from Section \ref{subsec:preliminaries-public-parameters}).
-
-    \item Let $\mathbb{S}$ represent a set of tuples $[K_i, C_i]$, where\vspace{.115cm}
-    \begin{align*}
-        K_i &= z_i G_0 + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n \\
-        C_i &= x_i H_0 + a_{i,1} H_1
-    \end{align*}
-
-    \item Let $\mathbb{S}^t$ represent a set of `transformed' tuples $[K^t_i, C^t_i]$, where\vspace{.115cm}
-    \begin{align*}
-        K^t_i &= \mathcal{H}_6(K_i, C_i)*K_i \\
-        C^t_i &= C_i
-    \end{align*}
-
-    \item Perform a range proof on each $C^t_i \in \mathbb{S}^t$ (recall Section \ref{subsubsec:confidential-transactions-range-proofs}).
-
-    \item Let $\mathbb{Q}$ represent a set of squashed tuples $[Q_i]$, where\vspace{.115cm}
-    \[Q_i = K^t_i + C^t_i\]
-
-    \item Let $\tilde{S}$ represent a tuple $[K', C']$ (e.g.\ a masked version of $\mathbb{S}^t[\pi]$), where\vspace{.115cm}
-    \begin{align*}
-        K' &= z' G_0 + s'_1 G_1 + s'_2 G_2 + ... + s'_n G_n \\
-        C' &= x' H_0 + a'_1 H_1
-    \end{align*}
-
-    \item Let $\tilde{Q} = K' + C'$.
-
-    \item Demonstrate that, within a security parameter $k$, $\tilde{Q}$ corresponds to some $Q_{\pi} \in \mathbb{Q}$, where $\pi$ is unknown to the verifier, such that:
-    \begin{enumerate}
-        \item The discrete log relation of $\tilde{Q} - Q_{\pi} = [(z' + x') - (\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]*G_0$ with respect to $G_0$ is known.
-    \end{enumerate}
-
-    \item Perform a range proof on $C'$.
-
-    \item Demonstrate knowledge of $z', s'_1,...,s'_n$ such that $K' = z' G_0 + s'_1 G_1 + s'_2 G_2 + ... + s'_n G_n$.
-\end{enumerate}
-
-The benefit of this specialization compared to the underlying membership proof model is you only need to prove the discrete log in one commitment to zero relation, rather than two. For example, with a SAG (e.g.\ LSAG \cite{Liu2004} without linking) or Groth/Bootle one-of-many proof on the set $\{\tilde{Q} - Q_i\}$.\footnote{In practice, it may be simpler to implement a membership proof on the equivalent set $\{Q_i - \tilde{Q}\}$.} The efficiency implications are discussed in Section \ref{sec:efficiency}, which compares possible instantiations of Seraphis using the two models.
-
-
-\subsection{Requirement satisfaction}
-\label{appendix:squashed-e-note-model-req-satisfaction}
-
-\subsubsection{Underlying membership proof model}
-
-We argue that the squashed e-note model satisfies the underlying membership proof model.
-
-Let $\mathbb{S}^t$ be the input to the underlying model. We will show that the following requirement, adapted from Section \ref{subsec:seraphis-membership proofs}, is met.
-
-\begin{enumerate}
-    \item Demonstrate that, within a security parameter $k$, $\tilde{S}$ corresponds to some $S^t_{\pi} \in \mathbb{S}^t$, where $\pi$ is unknown to the verifier, such that:
-    \begin{enumerate}
-        \item $s'_j == \mathcal{H}_6(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$
-        \item $a'_1 == a_{\pi,1}$
-    \end{enumerate}
-\end{enumerate}
-
-Observe the following.
-
-\begin{enumerate}
-    \item The prover must know $[(z' + x') - (\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]$ and $z'$ to satisfy the squashed e-note model, and $x'$ and $x_{\pi}$ to construct the range proofs on $C'$ and $C^t_{\pi}$. Therefore the prover must know $\mathcal{H}_6(K_{\pi}, C_{\pi})*z_{\pi}$. The point $\mathcal{H}_6(K_{\pi}, C_{\pi})$ is considered `public knowledge', so the prover must also know $z_{\pi}$ (which may be 0).
-
-    \item Range proofing $C_{\pi}$ and $C'$ means they have the form $x H_0 + a H_1$, implying they contain no $G_1,...,G_n$ components. Therefore, demonstrating discrete log with respect to $G_0$ in the commitment to zero $\tilde{Q} - Q_{\pi}$ means it must be the case that $s'_j == \mathcal{H}_6(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$ (i.e.\ all factors of $G_1,...,G_n$ in $\tilde{Q}$ and $K'$ must come from $K_{\pi}$).
-
-    \item Suppose $K_i$ has the form $K_i = z_i G_0 + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n + e H_1$. Since the model requires a demonstration that $K'$ does not contain any $H_1$ components, and the commitment to zero $\tilde{Q} - Q_{\pi}$ means all non-$G_0$ components balance in those two points, it must be the case that $C' = x' H_0 + (a_{i,1} + \mathcal{H}_6(K_{\pi}, C_{\pi})*e)*H_1$. However, the term $\mathcal{H}_6(K_{\pi}, C_{\pi})$ is both uniformly distributed and implicitly dependent on the values $a_{i,1}$ and $e$, so the value $a'_1 = (a_{i,1} + \mathcal{H}_6(K_{\pi}, C_{\pi})*e)$ will be uniformly distributed in $\mathbb{Z}_l$ (assuming $e$ is non-zero). Since the range proof on $C'$ means that $a'_1$ must be in the range $[0,...,2^z - 1]$, if $e \neq 0$ then the probability that a range proof on $a'_1$ can succeed is $2^z/l$. This means $a'_1 == a_{i,1}$ can be assumed to be true within the security parameter $k$ if $1/k > 2^z/l$.\footnote{Typically $l \approx 2^{252} - 2^{256}$, $2^z = 2^{64}$, and $k = 2^{128}$; $1/2^{128} > 2^{64}/2^{252}$ is true.} [[[formalize better?]]]
-\end{enumerate}
-
-\subsubsection{Seraphis structure}
-
-\begin{enumerate}
-    \item Note that a range proof on $C_i$ is equivalent to a range proof on $C^t_i$, since $C^t_i = C_i$. These range proofs will already exist, since membership proofs only reference e-notes in the ledger (which were created by transactions whose output e-notes' amount commitments were range proofed, or are coinbase e-notes whose amounts are known).
-
-    \item Seraphis linking tags are computed from the output of a membership proof, namely the point $K'$ in $\tilde{S}$. However, $K'$ in the squashed e-note model applied to Seraphis has the form $K' = t_k G_0 + \mathcal{H}_6(K^o_{\pi}, C_{\pi})*[k^o_a*G_1 + k^o_b*G_2]$. This means linking tags will have the form $\tilde{K} = ((\mathcal{H}_6(K^o_{\pi}, C_{\pi})*k^o_b)/(\mathcal{H}_6(K^o_{\pi}, C_{\pi})*k^o_a))*X$. Since the terms $\mathcal{H}_6(K^o_{\pi}, C_{\pi})$ cancel each other, linking tags in this model are the same as in the base model.
-
-    \item Step 10 in the above model is automatically satisfied by Seraphis because $K'$ is passed as input to the ownership/unspentness proof system, which demonstrates knowledge of the per-generator discrete log relations of its inputs.
-\end{enumerate}
-
-
-\subsection{Practical considerations}
-\label{appendix:squashed-e-note-model-practical-considerations}
-
-\begin{enumerate}
-    \item Transaction verifiers can pre-compute steps 3 and 5 from the above model for every e-note in the ledger. The squashed tuples $Q_i$ can be stored in anticipation of new transactions that may require them.
-
-    \item In transaction chaining (Section \ref{subsec:implementers-other-recommendations}), only step 8 in the above model needs to be deferred (assuming $Q_i$ values have been precomputed, and range proofs on $C_i$ already exist).
-\end{enumerate}
-
-
-
 \section{Composition proofs with Schnorr}
 \label{appendix:composition-with-schnorr}
 
-In this Appendix is one approach to satisfying the Seraphis ownership/unspentness proof requirements (Section \ref{subsec:seraphis-ownership-unspentness-proofs}), assuming $J == G_2$. First we lay out the proof system that satisfies those requirements, then we describe a proof structure in that system.\footnote{We leave applying the Fiat-Shamir transform \cite{fiat-shamir-transform} to the composition proof structure as an exercise for the reader.}
+We present a signature scheme that satisfies the Seraphis ownership/unspentness proof requirements (Section \ref{subsec:seraphis-ownership-unspentness-proofs}), assuming $J = G_2$. First we lay out the proof system that satisfies those requirements, then we describe a proof structure in that system.\footnote{We leave applying the Fiat-Shamir transform \cite{fiat-shamir-transform} to the composition proof structure as an exercise for the reader.}
 
 
-\subsection{Composition proof system}
-\label{appendix:composition-proof-system}
-
-[[[better terminology than `proof system'?]]]
+\subsection{Overview}
+\label{appendix:composition-proof-overview}
 
 \begin{enumerate}
     \item Assume there is a group point $K = x G_0 + y G_1 + z G_2$.
@@ -138,37 +35,300 @@ In this Appendix is one approach to satisfying the Seraphis ownership/unspentnes
 [[[explain how it satisfies the requirements?]]]
 
 
-\subsection{Composition proof structure}
-\label{appendix:composition-proof-structure}
+\subsection{Construction}
+\label{appendix:composition-proof-construction}
 
-[[[better terminology than `proof structure'?]
-
-Our proof structure is a Schnorr-like $\Sigma$-protocol between prover and verifier. Notably, for the discrete logs of $\tilde{K}$ and $K_{t2}$ from the proof system, we use the concise approach from \cite{clsag-eprint} to reduce proof sizes when constructing multiple proofs in parallel (i.e.\ reduce the number of responses required). Furthermore, we use the powers-of-$\mu$ approach from \cite{triptych-preprint} (i.e.\ `aggregation coefficients'), instead of distinct per-element hashes, for simplicity.
-
-Note that if a composition proof is made for one input keyset ($n = 1$), then the proof structure degenerates into a plain tuple of Schnorr proofs (i.e.\ the aggregation coefficients disappear, since $\mu^0 = 1$).
+Our proof is a Schnorr-like $\Sigma$-protocol between prover and verifier.
 
 \begin{enumerate}
-    \item Suppose the prover has keys $[x_i, y_i, z_i, K_i]$ for $i \in 1,...,n$, where $K_i = x_i G_0 + y_i G_1 + z_i G_2$.
+    \item Suppose the prover has keys $x, y, z, K$, where $K = x G_0 + y G_1 + z G_2$.
 
-    \item The prover generates random scalars $\alpha_a, \alpha_b, \alpha_1, ..., \alpha_n \in_R \mathbb{Z}_l$.
+    \item The prover generates random scalars $\alpha_a, \alpha_b, \alpha \in_R \mathbb{Z}_l$.
 
-    \item The prover computes $\alpha_a G_0$, $\alpha_b G_2$, $\alpha_i K_i$, $K_{t1,i} = (1/y_i)*K_i$, and $\tilde{K}_i = (z_i/y_i)*G_2$ for $i \in 1,...n$. He sends all of those to the verifier along with the keys $K_i$.
+    \item The prover computes $\alpha_a G_0$, $\alpha_b G_2$, $\alpha K$, $K_{t1} = (1/y)*K$, and $\tilde{K} = (z/y)*G_2$. He sends all of those to the verifier along with the key $K$.
 
-    \item The verifier generates random scalars $c, \mu_a, \mu_b \in_R \mathbb{Z}_l$ and sends them to the prover.
+    \item The verifier generates random challenge $c \in_R \mathbb{Z}_l$ and sends it to the prover.
 
-    \item The prover computes responses $r_a, r_b, r_1, ..., r_n$ and sends them to the verifier.\vspace{.115cm}
+    \item The prover computes responses $r_a, r_b, r$ and sends them to the verifier.\vspace{.115cm}
     \begin{align*}
-        r_a &\equiv \alpha_a - c*(\sum^n_{i=1} \mu_a^{i-1}*(x_i/y_i)) \\
-        r_b &\equiv \alpha_b - c*(\sum^n_{i=1} \mu_b^{i-1}*(z_i/y_i)) \\
-        r_i &\equiv \alpha_i - c*(1/y_i)
+        r_a &\equiv \alpha_a - c*(x/y) \\
+        r_b &\equiv \alpha_b - c*(z/y) \\
+        r   &\equiv \alpha   - c*(1/y)
     \end{align*}
 
-    \item The verifier computes $K_{t2,i} = K_{t1,i} - G_1 - \tilde{K}_i$, then checks the following equalities. If any of them fail (or if $K_{t1,i}$ or $\tilde{K}_i$ equal the identity element $I$), then the prover has failed to satisfy the composition proof system.\vspace{.115cm}
+    \item The verifier computes $K_{t2} = K_{t1} - G_1 - \tilde{K}$, then checks the following equalities. If any of them fail (or if $K_{t1}$ or $\tilde{K}$ equal the identity element $I$), then the prover has failed to satisfy the composition proof system.\vspace{.115cm}
     \begin{align*}
-        \alpha_a G_0 &== r_a G_0 + c*(\sum^n_{i=1} \mu_a^{i-1}*K_{t2,i}) \\
-        \alpha_b G_2 &== r_b G_2 + c*(\sum^n_{i=1} \mu_b^{i-1}*\tilde{K}_i) \\
-        \alpha_i K_i &== r_i K_i + c*K_{t1,i}
+        \alpha_a G_0 &= r_a G_0 + c K_{t2} \\
+        \alpha_b G_2 &= r_b G_2 + c \tilde{K} \\
+        \alpha   K   &= r K     + c K_{t1}
     \end{align*}
 \end{enumerate}
+
+
+
+\section{Squashed enote model}
+\label{appendix:squashed-enote-model}
+
+The squashed enote model is a specialization of the Seraphis membership proof model that allows relatively simpler and more efficient proof structures.
+
+First we will describe the model, then discuss how it satisfies relevant security requirements when applied to Seraphis.
+
+
+\subsection{Model}
+\label{appendix:squashed-enote-model-model}
+
+\begin{enumerate}
+    \item Require $G_0 = H_0$ and that the discrete logarithm of $H_1$ with respect to any of $G_1,...,G_n$ is unknown (in addition to all the other requirements from Section \ref{subsec:preliminaries-public-parameters}).
+
+    \item Let $\mathbb{S}$ represent a set of tuples $[K_i, C_i]$, where\vspace{.115cm}
+    \begin{align*}
+        K_i &= z_i G_0 + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n \\
+        C_i &= x_i H_0 + a_{i,1} H_1
+    \end{align*}
+
+    \item Let $\mathbb{S}^t$ represent a set of `transformed' tuples $[K^t_i, C^t_i]$, where\vspace{.115cm}
+    \begin{align*}
+        K^t_i &= \mathcal{H}_1(K_i, C_i)*K_i \\
+        C^t_i &= C_i
+    \end{align*}
+
+    \item Perform a range proof on each $C^t_i \in \mathbb{S}^t$ (recall Section \ref{subsubsec:confidential-transactions-range-proofs}).
+
+    \item Let $\tilde{S}$ represent a tuple $[K', C']$ (e.g.\ a masked version of $\mathbb{S}^t[\pi]$), where\vspace{.115cm}
+    \begin{align*}
+        K' &= z' G_0 + s'_1 G_1 + s'_2 G_2 + ... + s'_n G_n \\
+        C' &= x' H_0 + a'_1 H_1
+    \end{align*}
+
+    \item Let $\mathbb{Q}$ represent a set of squashed tuples $[Q_i]$, where\vspace{.115cm}
+    \[Q_i = K^t_i + C^t_i\]
+
+    \item Let $\tilde{Q} = K' + C'$.
+
+    \item Demonstrate that, within a security parameter $k$, $\tilde{Q}$ corresponds to some $Q_{\pi} \in \mathbb{Q}$, where $\pi$ is unknown to the verifier, such that:
+    \begin{enumerate}
+        \item The discrete log relation of $\tilde{Q} - Q_{\pi} = [(z' + x') - (\mathcal{H}_1(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]*G_0$ with respect to $G_0$ is known.
+    \end{enumerate}
+
+    \item Perform a range proof on $C'$.
+
+    \item Demonstrate knowledge of $z', s'_1,...,s'_n$ such that $K' = z' G_0 + s'_1 G_1 + s'_2 G_2 + ... + s'_n G_n$.
+\end{enumerate}
+
+The benefit of this specialization compared to the underlying membership proof model is you only need to prove the discrete log in one commitment to zero relation, rather than two. For example, with a SAG (e.g.\ LSAG \cite{Liu2004} without linking) or Grootle proof (Appendix \ref{appendix:grootle-proof}) on the set $\{\tilde{Q} - Q_i\}$.\footnote{In practice, it may be simpler to implement a membership proof on the equivalent set $\{Q_i - \tilde{Q}\}$.} The efficiency implications are discussed in Section \ref{sec:efficiency}, which compares possible instantiations of Seraphis using the two models.
+
+
+\subsection{Requirement satisfaction}
+\label{appendix:squashed-enote-model-req-satisfaction}
+
+\subsubsection{Underlying membership proof model}
+
+We argue that the squashed enote model satisfies the underlying membership proof model.
+
+Let $\mathbb{S}^t$ be the input to the underlying model. We will show that the following requirement, adapted from Section \ref{subsec:seraphis-membership proofs}, is met.
+
+\begin{enumerate}
+    \item Demonstrate that, within a security parameter $k$, $\tilde{S}$ corresponds to some $S^t_{\pi} \in \mathbb{S}^t$, where $\pi$ is unknown to the verifier, such that:
+    \begin{enumerate}
+        \item $s'_j == \mathcal{H}_1(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$
+        \item $a'_1 == a_{\pi,1}$
+    \end{enumerate}
+\end{enumerate}
+
+Observe the following.
+
+\begin{enumerate}
+    \item The prover must know $[(z' + x') - (\mathcal{H}_1(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]$ and $z'$ to satisfy the squashed enote model, and $x'$ and $x_{\pi}$ to construct the range proofs on $C'$ and $C^t_{\pi}$. Therefore the prover must know $\mathcal{H}_1(K_{\pi}, C_{\pi})*z_{\pi}$. The value $\mathcal{H}_1(K_{\pi}, C_{\pi})$ is considered `public knowledge', so the prover must also know $z_{\pi}$ (which may be 0).
+
+    \item Range proofing $C_{\pi}$ and $C'$ means they have the form $x H_0 + a H_1$, implying they contain no $G_1,...,G_n$ components. Therefore, demonstrating discrete log with respect to $G_0$ in the commitment to zero $\tilde{Q} - Q_{\pi}$ means it must be the case that $s'_j == \mathcal{H}_1(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$ (i.e.\ all factors of $G_1,...,G_n$ in $\tilde{Q}$ and $K'$ must come from $K_{\pi}$).
+
+    \item Suppose $K_i$ has the form $K_i = z_i G_0 + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n + e H_1$. Since the model requires a demonstration that $K'$ does not contain any $H_1$ components, and the commitment to zero $\tilde{Q} - Q_{\pi}$ means all non-$G_0$ components balance in those two points, it must be the case that $C' = x' H_0 + (a_{i,1} + \mathcal{H}_1(K_{\pi}, C_{\pi})*e)*H_1$. However, the term $\mathcal{H}_1(K_{\pi}, C_{\pi})$ is both uniformly distributed and implicitly dependent on the values $a_{i,1}$ and $e$, so the value $a'_1 = (a_{i,1} + \mathcal{H}_1(K_{\pi}, C_{\pi})*e)$ will be uniformly distributed in $\mathbb{Z}_l$ (assuming $e$ is non-zero). Since the range proof on $C'$ means that $a'_1$ must be in the range $[0,...,2^z - 1]$, if $e \neq 0$ then the probability that a range proof on $a'_1$ can succeed is $2^z/l$. This means $a'_1 == a_{i,1}$ can be assumed to be true within the security parameter $k$ if $1/k > 2^z/l$.\footnote{Typically $l \approx 2^{252} - 2^{256}$, $2^z = 2^{64}$, and $k = 2^{128}$; $1/2^{128} > 2^{64}/2^{252}$ is true.} [[[formalize better?]]]
+\end{enumerate}
+
+\subsubsection{Seraphis structure}
+
+\begin{enumerate}
+    \item A range proof on $C_i$ is equivalent to a range proof on $C^t_i$, since $C^t_i = C_i$. These range proofs will already exist, since membership proofs only reference enotes in the ledger (which were created by transactions whose output enotes' amount commitments were range proofed, or are coinbase enotes whose amounts are known).
+
+    \item Seraphis linking tags are computed from the output of a membership proof, namely the point $K'$ in $\tilde{S}$. However, $K'$ in the squashed enote model applied to Seraphis has the form $K' = t_k G_0 + \mathcal{H}_1(K^o_{\pi}, C_{\pi})*[k^o_a*G_1 + k^o_b*G_2]$. This means linking tags will have the form $\tilde{K} = ((\mathcal{H}_1(K^o_{\pi}, C_{\pi})*k^o_b)/(\mathcal{H}_1(K^o_{\pi}, C_{\pi})*k^o_a))*J$. Since the terms $\mathcal{H}_1(K^o_{\pi}, C_{\pi})$ cancel each other, linking tags in this model are the same as in the base model.
+
+    \item Step 10 in the above model is automatically satisfied by Seraphis because $K'$ is passed as input to the ownership/unspentness proof system, which demonstrates knowledge of the per-generator discrete log relations of its inputs.
+\end{enumerate}
+
+
+\subsection{Practical considerations}
+\label{appendix:squashed-enote-model-practical-considerations}
+
+Transaction verifiers can pre-compute steps 3 and 6 from the above model for every enote in the ledger. The squashed tuples $Q_i$ can be stored in anticipation of new transactions that may require them.
+
+
+
+\section{Grootle proof}
+\label{appendix:grootle-proof}
+
+We present a Groth/Bootle one-of-many proof \cite{groth-one-out-of-many, bootle-one-of-many} that satisfies the membership proof requirements of the squashed enote model (Appendix \ref{appendix:squashed-enote-model}). The proof construction is a degenerate form of the one-of-many proof in Appendix B of the Lelantus-Spark paper \cite{lelantus-spark}, so we have adapted their description and security proof largely verbatim.
+
+
+\subsection{Construction}
+\label{appendix:grootle-proof-construction}
+
+Let there be a tuple of algorithms ($\mathsf{GrootleProve}$, $\mathsf{GrootleVerify}$) for the following relation, where we let $N = n^m$:\vspace{.115cm}
+\begin{align*}
+    \{pp_{\textrm{grootle}}, \{S_k\}^{N-1}_{k=0} \subset \mathbb{G}, S' \in \mathbb{G}\textrm{; } l \in \mathbb{N}, s \in \mathbb{F} : 0 \leq l < N, S_l - S' = s G_0 \}
+\end{align*}
+
+Let $\delta(i,j) : \mathbb{N}^2 \xrightarrow{} \mathbb{F}$ be the Kronecker delta function. For any integers $k$ and $j$ such that $0 \leq k < N$ and $0 \leq j < m$, let $k_j$ denote the $j$ digit of the $n$-ary decomposition of $k$. Let $\mathsf{MatrixCom}$ : $\mathbb{F} \times \mathbb{F}^{mn} \times \mathbb{F}^{mn} \xrightarrow{} \mathbb{G}$ be an additively-homomorphic matrix commitment construction that commits to the entries of two matrices, and is perfectly hiding and computationally binding.
+
+The protocol proceeds as follows:
+
+\begin{enumerate}
+    \item The prover selects
+    \[r_A, r_B, \{a_{j,i}\}^{m-1,n-1}_{j=0,i=1} \in \mathbb{F}\]
+
+    uniformly at random, and, for each $j \in [0,m)$, sets\vspace{.115cm}
+    \[a_{j,0} = - \sum^{n-1}_{i=1} a_{j,i}\]
+
+    \item The prover computes the following:\vspace{.115cm}
+    \begin{align*}
+        A &\equiv \mathsf{MatrixCom} \left(r_A, \{a_{j,i}\}^{m-1,n-1}_{j,i=0}, \{-a^2_{j,i}\}^{m-1,n-1}_{j,i=0}\right) \\
+        B &\equiv \mathsf{MatrixCom} \left(r_B, \{\delta(l_{j},i)\}^{m-1,n-1}_{j,i=0}, \{a_{j,i}(1-2\delta(l_j,i))\}^{m-1,n-1}_{j,i=0}\right)
+    \end{align*}
+
+    \item For each $j \in [0,m)$, the prover selects $\rho_j \in \mathbb{F}$ uniformly at random, and computes the following:\vspace{.115cm}
+    \begin{align*}
+        X_j \equiv \sum^{N-1}_{k=0} p_{k,j}(S_k - S') + \rho_j G_0
+    \end{align*}
+
+    Here each $p_{k,j}$ is defined such that for all $k \in [0,N)$ we have\vspace{.115cm}
+    \[\prod^{m-1}_{j=0} (\delta(l_j,k_j) x + a_{j,k_{j}}) = \delta(l,k) x^m + \sum^{m-1}_{j=0} p_{k,j}{x^j}\]
+
+    for indeterminate $x$.
+
+    \item The prover sends $A, B, \{X_j\}^{m-1}_{j=0}$ to the verifier.
+
+    \item The verifier selects $x \in \mathbb{F}$ uniformly at random and sends it to the prover.
+
+    \item For each $j \in [0,m)$ and $i \in [1,n)$, the prover computes $f_{j,i} \equiv \delta(l_j,i) x + a_{j,i}$ and the following values:
+    \begin{align*}
+        z_A &\equiv r_A + x r_B \\
+        z   &\equiv s x^m - \sum^{m-1}_{j=0} \rho_j x^j
+    \end{align*}
+
+    \item The prover sends $\{f_{j,i}\}^{m-1,n-1}_{j=0,i=1}, z_A, z$ to the verifier.
+
+    \item For each $j \in [0,m)$, the verifier sets $f_{j,0} \equiv x - \sum^{n-1}_{i=1} f_{j,i}$ and accepts the proof if and only if\vspace{.115cm}
+    \[A + x B = \mathsf{MatrixCom} \left(z_A, \{f_{j,i}\}^{m-1,n-1}_{j,i=0}, \{f_{j,i}(x - f_{j,i})\}^{m-1,n-1}_{j,i=0} \right)\]
+
+    and\vspace{.115cm}
+    \begin{align*}
+        \sum^{N-1}_{k=0} \left(\prod^{m-1}_{j=0} f_{j,{k_j}} \right) (S_k - S') - \sum^{m-1}_{j=0} x^j X_j = z G_0
+    \end{align*}
+
+    are true.
+\end{enumerate}
+
+This interactive protocol can be made non-interactive using the Fiat-Shamir technique, which replaces the verifier challenge $x$ with the output of a cryptographic hash function on transcript inputs.
+
+
+\subsection{Security proof}
+\label{appendix:grootle-proof-security}
+
+We now prove that the above protocol is complete, special sound, and honest-verifier zero knowledge.
+
+\subsubsection{Completeness}
+\label{appendix:grootle-proof-security-completeness}
+
+Completeness of the protocol follows by straightforward algebra.
+
+\subsubsection{Special honest-verifier zero knowledge}
+\label{appendix:grootle-proof-security-special-zk}
+
+To show that the protocol is special honest-verifier zero knowledge, we construct a simulator that, when provided a valid statement and random verifier challenge $x$, produces a proof transcript identically distributed to that of a real proof.
+
+To produce a simulated transcript on random $x$, the simulator samples\vspace{.115cm}
+\[ B, \{X_j\}^{m-1}_{j=1} \in \mathbb{G} \]
+
+and
+\[ z_A, z, \{f_{j,i}\}^{m-1,n-1}_{j=0,i=1} \in \mathbb{F} \]
+
+uniformly at random. It defines\vspace{.115cm}
+\[ f_{j,0} = x - \sum^{n-1}_{i=1} f_{j,i} \]
+
+for each $j \in [0,m)$, and sets\vspace{.115cm}
+\[ A = \mathsf{MatrixCom} \left( z_A, \{f_{j,i}\}^{m-1,n-1}_{j,i=0}, \{f_{j,i}(x-f_{j,i})\}^{m-1,n-1}_{j,i=0} \right) - x B \]
+
+as well. It uses the final two verification equations to compute $X_0$:\vspace{.115cm}
+\begin{align*}
+    X_0  = \sum^{N-1}_{k=0} \left( \prod^{m-1}_{j=0} f_{j,k_j} \right) (S_k - S') - \sum^{m-1}_{j=1} x^j X_j - z G_0
+\end{align*}
+
+Since the challenge $x$ is sampled uniformly at random by construction, the commitment constructions are perfectly hiding, $\{\rho_j\}^{m-1}_{j=0}$ are sampled uniformly at random in a real proof, and the decisional Diffie-Hellman problem is hard in $\mathbb{G}$, all proof elements in both the simulation and real proofs are either independently uniformly distributed at random or uniquely determined by other transcript elements. Hence the protocol is special honest-verifier zero knowledge.
+
+\subsubsection{Special sound}
+\label{appendix:grootle-proof-security-special-sound}
+
+We now show that the protocol is $(m+1)$-special sound for $m > 1$. That is, we construct an extractor that, when presented with a set of $m + 1$ distinct challenges and corresponding responses to the same initial statement, produces a set of extracted witness elements consistent with the statement. Consider a collection of $m+1$ distinct challenges $\{x_{\iota}\}^m_{\iota=0}$ and corresponding valid responses:
+\[ \left\{ \{f^{(\iota)}_{j,i}\}^{m-1,n-1}_{j=0,i=1}, z^{(\iota)}_A, z^{(\iota)} \right\}^m_{\iota=0} \]
+
+Successful verification on indices $\iota \in \{0,1\}$ gives the following:\vspace{.115cm}
+\begin{align*}
+    (x^{(0)} - x^{(1)}) B = \mathsf{MatrixCom} &\left( z^{(0)}_A - z^{(1)}_A, \right. \\
+    &\left. \{f^{(0)}_{j,i} - f^{(1)}_{j,i}\}^{m-1,n-1}_{j,i=0}, \right. \\
+    &\left. \{f^{(0)}_{j,i}(x^{(0)} - f^{(0)}_{j,i}) - f^{(1)}_{j,i}(x^{(1)} - f^{(1)}_{j,i})\}^{m-1,n-1}_{j,i=0} \right)
+\end{align*}
+
+For all $j \in [0,m)$ and $i \in [0,n)$, if we let\vspace{.115cm}
+\[ b_{j,i} = \frac{f^{(0)}_{j,i} - f^{(1)}_{j,i}}{x^{(0)} - x^{(1)}} \]
+
+and\vspace{.115cm}
+\[ c_{j,i} = \frac{f^{(0)}_{j,i}(x^{(0)} - f^{(0)}_{j,i}) - f^{(1)}_{j,i}(x^{(1)} - f^{(1)}_{j,i})}{x^{(0)} - x^{(1)}} \]
+
+and\vspace{.115cm}
+\[r_B = \frac{z^{(0)}_A - z^{(1)}_A}{x^{(0)} - x^{(1)}}\]
+
+then we can express\vspace{.115cm}
+\[ B = \mathsf{MatrixCom} \left(  r_B, \{b_{j,i}\}^{m-1,n-1}_{j,i=0}, \{c_{j,i}\}^{m-1,n-1}_{j,i=0}\right) \]
+
+If for $j \in [0,m)$ and $i \in [0,n)$ we further define\vspace{.115cm}
+\[ a_{j,i} = f^{(0)}_{j,i} - x^{(0)} b_{i,j} \]
+
+and
+\[ d_{i,j} = f^{(0)}_{j,i}(x^{(0)} - f^{(0)}_{j,i}) - x^{(0)} c_{j,i} \]
+
+and $r_A = z^{(0)}_A - x^{(0)} r_B$, then we can express\vspace{.115cm}
+\[ A = \mathsf{MatrixCom} \left( r_A, \{a_{j,i}\}^{m-1,n-1}_{j,i=0}, \{d_{j,i}\}^{m-1,n-1}_{j,i=0} \right) \]
+
+as well. Observe that since the commitment construction is computationally binding, for all $\iota \in [0,m]$ we must have $b_{j,i} x^{(\iota)} + a_{j,i} = f^{(\iota)}_{j,i}$ and $c_{j,i} x^{(\iota)} + d_{j,i} = f^{(\iota)}_{j,i}(x^{(\iota)} - f^{(\iota)}_{j,i})$ for $j \in [0,m)$ and $i \in [0,n)$. This implies in particular that for $\iota \in \{0,1,2\}, j \in [0,m), i \in [0,n)$ we have\vspace{.115cm}
+\[ c_{j,i} x^{(\iota)} + d_{j,i} = b_{j,i}(1 - b_{j,i})x^{(\iota)2} + (1 - 2 b_{j,i}) a_{j,i} x^{(\iota)} - a^2_{j,i} \]
+
+and hence $b_{j,i}(1 - b_{j,i}) = 0$, so each $b_{j,i} \in \{0,1\}$.
+
+We also have, by construction, that\vspace{.115cm}
+\[ x^{(\iota)} = \sum^{n-1}_{i=0} f^{(\iota)}_{j,i} = x^{(\iota)} \sum^{n-1}_{i=0} b_{j,i} + \sum^{n-1}_{i=0} a_{j,i} \]
+
+for $\iota \in [0,m], j\in [0,m)$, so $\sum^{n-1}_{i=0} b_{j,i} = 1$. This means we can extract $l \in [0,N)$ such that each $b_{j,i} = \delta(l_j,i)$.
+
+Now if we define for each $k \in [0,N)$ the polynomial\vspace{.115cm}
+\[ p_k(x) = \prod^{m-1}_{j=0} \left[ \delta(l_j, k_j) x + a_{j, k_j} \right] \]
+
+in $x$, we have deg$(p_k) = m$ if and only if $k = l$. Verification can therefore be expressed as\vspace{.115cm}
+\begin{align*}
+    x^{(\iota)m}(S_l - S') - \sum^{m-1}_{j=0} x^{(\iota)j} \overline{X}_j = z^{(\iota)} G_0
+\end{align*}
+
+for $\iota \in [0,m]$, where the set $\{\overline{X}_j\}^{m-1}_{j=0}$ can be uniquely derived. Consider a Vandermonde matrix $V$ such that the $\iota$ row is the vector $(1, x^{(\iota)}, ..., x^{(\iota)m})$, and note since each challenge is distinct, we have det$(V) \neq 0$ with high probability, so the rows of $V$ span $\mathbb{F}^{m+1}$. This means we can find $\{\theta_{\iota}\}^m_{\iota = 0}$ such that the equation
+\[ \sum^{m}_{\iota=0} \theta_{\iota} x^{(\iota)j} = \delta(j,m) \]
+
+holds for $j \in [0,m]$.
+
+We can therefore build a linear combination of each of the two above verification equations, taking advantage of the Vandermonde-derived weights:\vspace{.115cm}
+\begin{align*}
+    S_l - S' = \sum^m_{\iota=0} \theta_{\iota} x^{(\iota)m} (S_l - S') + \sum^m_{\iota=0} \theta_{\iota} \left( x^{(\iota)j} \overline{X}_j \right) = \left( \sum^m_{\iota=0} \theta_{\iota} z^{(\iota)} \right) G_0
+\end{align*}
+
+This equation provides the remaining extraction\vspace{.115cm}
+\[ s = \sum^m_{\iota=0} \theta_{\iota} z^{(\iota)} \]
+
+such that $S_l - S' = s G_0$, which completes the proof.
 
 \end{appendices}
