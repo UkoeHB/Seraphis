@@ -111,7 +111,7 @@ This separation allows the definition of linking tags to be fairly open-ended. W
 
 In Appendix \ref{appendix:squashed-enote-model} we introduce a more-restrictive membership proof model layered on the primary model in this paper. We call it the `squashed enote' model. Concrete proving structures in that model are non-trivially more efficient than structures in the plain model, allowing relatively larger anonymity set sizes as a function of proof complexity and size compared to structures in the plain model, when comparing structures based on the same proving systems (see an efficiency analysis in Section \ref{sec:efficiency}).
 
-Appendix \ref{appendix:composition-with-schnorr} introduces a Seraphis-compatible ownership/unspentness proof, and Appendix \ref{appendix:grootle-proof} introduces a Seraphis-compatible membership proof for the squashed enote model.
+Appendix \ref{appendix:composition-with-schnorr} introduces Seraphis composition proofs, which are a Seraphis-compatible ownership/unspentness proof. Appendix \ref{appendix:grootle-proof} introduces Grootle proofs, a Seraphis-compatible membership proof for the squashed enote model.
 
 
 
@@ -139,7 +139,7 @@ Let each of the following sets contain generators of $\mathbb{G}$, where each ge
 \begin{itemize}
     \item We use additive notation for group operations on $\mathbb{G}$. This means, for example, that the binary group operation between $G$ and $H$ is denoted $G + H$.
 
-    \item This paper contains no exponentiation. All superscripts, such as the $o$ in $k^o$, are merely for descriptive purposes and have no mathematical significance.
+    \item This paper contains no exponentiation outside Appendix \ref{appendix:grootle-proof}. Superscripts, such as the $o$ in $k^o$, are merely for descriptive purposes and have no mathematical significance.
 
     \item For group element $P$ and scalar $x \in \mathbb{Z}_l$, $x P$ and $x*P$ both indicate scalar multiplication. The use of asterisks ($*$) in some places but not others is meant to aid visual clarity where appropriate (usually when multiplying by a parenthesized scalar or by a scalar that has a superscript).
 
@@ -209,8 +209,8 @@ An enote image is a representation of an enote.
 
     \item \textbf{Masked address}: The enote's address with a masking factor.\vspace{.115cm}
     \begin{align*}
-        K'^o &= t_k G_0 + K^o \\
-        K'^o &= (t_k + k^o_0)*G_0 + k^o_1*G_1 + k^o_2*G_2
+        K' &= t_k G_0 + K^o \\
+        K' &= (t_k + k^o_0)*G_0 + k^o_1*G_1 + k^o_2*G_2
     \end{align*}
 
     \item \textbf{Linking tag}: The enote's linking tag.\vspace{.115cm}
@@ -251,22 +251,22 @@ A proving system/structure is only eligible to be used as a Seraphis membership 
     \item Let $\mathbb{S}$ represent a set of tuples $[K_i, C_i]$, where\vspace{.115cm}
     \begin{align*}
         K_i &= z_i G_0 + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n \\
-        C_i &= x_i H_0 + a_{i,1} H_1 + a_{i,2} H_2 + ... + a_{i,n} H_m
+        C_i &= x_i H_0 + a_{i,1} H_1 + a_{i,2} H_2 + ... + a_{i,m} H_m
     \end{align*}
 
     \item Let $\tilde{S}$ represent a tuple $[K', C']$, where\vspace{.115cm}
     \begin{align*}
         K' &= z' G_0 + s'_1 G_1 + s'_2 G_2 + ... + s'_n G_n \\
-        C' &= x' H_0 + a'_1 H_1 + a'_2 H_2 + ... + a'_n H_m
+        C' &= x' H_0 + a'_1 H_1 + a'_2 H_2 + ... + a'_m H_m
     \end{align*}
 
     \item The proving system must be able to demonstrate that, within a security parameter $k$, $\tilde{S}$ corresponds to some $S_{\pi} \in \mathbb{S}$, where $\pi$ is unknown to the verifier, such that:
     \begin{enumerate}
-        \item $s'_j == s_{\pi,j}$ for $j \in 1,...,n$
-        \item $a'_j == a_{\pi,j}$ for $j \in 1,...,m$
+        \item $s'_p == s_{\pi,p}$ for $p \in 1,...,n$
+        \item $a'_q == a_{\pi,q}$ for $q \in 1,...,m$
     \end{enumerate}
 
-    \item The proving system should be considered unusable if, given a proof $\sigma$ that $\tilde{S}$ corresponds to some $S_{\pi}$ in the set $\mathbb{S}$, an observer can guess the index $\pi$ with probability $> 1/|\mathbb{S}'| + \epsilon(k)$, where $\mathbb{S}' = \mathbb{S}$\textbackslash$\mathbb{S}_O$ and $S_{\pi} \in \mathbb{S}'$, $\mathbb{S}_O$ are tuples the observer knows can't have been subjects of the proof (in the context of Seraphis, if tuples $S$ represent enotes, then for example he owns the enotes in $\mathbb{S}_O$), and the observer has no special knowledge about the elements in $\mathbb{S}'$ (however, he can know $z_i G_0$, $x_i$, and $a_{i,j}$ for all $S_i \in \mathbb{S}'$).\footnote{In practice, $\pi$ can often be guessed with probability at least marginally above $1/|\mathbb{S}'|$. This is because the circumstances around when enotes are recorded in the ledger are often observable. Things like timing information, patterns of behavior, IP addresses of transaction submitters, transaction fees, etc., can all form the basis of heuristics for analyzing the true member referenced by a membership proof. See the discussions in \cite{AnalysisOfLinkability} and \cite{foundations-ring-sampling} for example.}
+    \item The proving system should be considered unusable if, given a proof $\sigma$ that $\tilde{S}$ corresponds to some $S_{\pi}$ in the set $\mathbb{S}$, an observer can guess the index $\pi$ with probability $> 1/|\mathbb{S}'| + \epsilon(k)$, where $\mathbb{S}' = \mathbb{S}$\textbackslash$\mathbb{S}_O$ and $S_{\pi} \in \mathbb{S}'$, $\mathbb{S}_O$ are tuples the observer knows can't have been subjects of the proof (in the context of Seraphis, if tuples $S$ represent enotes, then for example he owns the enotes in $\mathbb{S}_O$), and the observer has no special knowledge about the elements in $\mathbb{S}'$ (however, he can know $z_i G_0$, $x_i$, and $a_{i,q}$ for all $S_i \in \mathbb{S}'$).\footnote{In practice, $\pi$ can often be guessed with probability at least marginally above $1/|\mathbb{S}'|$. This is because the circumstances around when enotes are recorded in the ledger are often observable. Things like timing information, patterns of behavior, IP addresses of transaction submitters, transaction fees, etc., can all form the basis of heuristics for analyzing the true member referenced by a membership proof. See the discussions in \cite{AnalysisOfLinkability} and \cite{foundations-ring-sampling} for example.}
 \end{enumerate}
 
 In the context of Seraphis, we straightforwardly construct tuples $S$ directly from enotes, which can be referenced with simple ledger indices for verifiers to find (in a naive implementation),\footnote{If the size of $\mathbb{S}$ is small, then it may be practical to reference enotes with simple indices. As $\mathbb{S}$ gets large, more sophisticated data-compression techniques are advisable to minimize transaction sizes. For example, deterministically selecting members of the anonymity set using public entropy and a hash function \cite{chator-green-how-to-squeeze-crowd}.} and tuples $\tilde{S}$ from enote images. Readers will note that a membership proof says nothing about how $K$ and $C$ are constructed (i.e.\ the values of $G_0,...$, $H_0,...$, etc.). In future sections we will add more constraints to guarantee that enotes and enote images found in transactions have the expected forms (within a security parameter).
@@ -299,7 +299,7 @@ We integrate that `composition proof' model into Seraphis in the following way (
 Suppose a membership proof $\sigma_{mp}$ shows that $\tilde{S}$ corresponds to some $S_{\pi}$ in the set $\mathbb{S}$. Then suppose the key $K' = z' G_0 + s'_1 G_1 + s'_2 G_2 + ...$ from $\tilde{S}$ is passed as input to the above proof system, and a valid proof is created. Observe the following.
 
 \begin{itemize}
-    \item For the composition proof to succeed, it must be the case that all $s'_x == 0$ for $x \geq 3$. This implies the key $K_{\pi}$ from $S_{\pi}$ (which $K'$ is based on) has the following form: $K_{\pi} = z_{\pi} G_0 + s_{\pi, 1} G_1 + s_{\pi, 2} G_2$. Moreover, the prover must know $z_{\pi}, s_{\pi, 1}, s_{\pi, 2}$.
+    \item For the composition proof to succeed, it must be the case that all $s'_p == 0$ for $p \geq 3$. This implies the key $K_{\pi}$ from $S_{\pi}$ (which $K'$ is based on) has the following form: $K_{\pi} = z_{\pi} G_0 + s_{\pi, 1} G_1 + s_{\pi, 2} G_2$. Moreover, the prover must know $z_{\pi}, s_{\pi, 1}, s_{\pi, 2}$.
 
     \item It must be the case that $\tilde{K} = (s_{\pi, 2}/ s_{\pi, 1})*J$.
 
@@ -316,7 +316,7 @@ The transaction's enote image structure records $\tilde{S} = [K', C']$ and $\til
 
 In accordance with the Confidential Transactions technique \cite{maxwell-ct-2}, Seraphis amounts are recorded as {\em Pedersen commitments}, which hide the amounts involved from observers (they have the `perfectly hiding' property). Even though observers cannot see transaction amounts directly, they should still be able to verify that the sum of input amounts always equals the sum of output amounts in every transaction.
 
-First note that, thanks to our membership proof model (Section \ref{subsec:seraphis-membership proofs}), the commitment $C'$ in an enote image will contain the same values $a_{\pi,1},...,a_{\pi,n}$ as the commitment $C$ in the enote being spent. In Section \ref{subsubsec:confidential-transactions-range-proofs} we will prove that enote commitments have the form $C = x G_0 + a G_1$ as expected (i.e.\ prove that $a_{\pi,x} == 0$ for $x \geq 2$), and hence the amount $a$ in $C' = v_c G_0 + a G_1$ equals the amount in the original commitment.
+First note that, thanks to our membership proof model (Section \ref{subsec:seraphis-membership proofs}), the commitment $C'$ in an enote image will contain the same values $a_{\pi,1},...,a_{\pi,m}$ as the commitment $C$ in the enote being spent. In Section \ref{subsubsec:confidential-transactions-range-proofs} we will prove that enote commitments have the form $C = x G_0 + a G_1$ as expected (i.e.\ prove that $a_{\pi,q} == 0$ for $q \geq 2$), and hence the amount $a$ in $C' = v_c G_0 + a G_1$ equals the amount in the original commitment.
 
 Pedersen commitments have the `homomorphic' property, which means, for example, that if $P_1 = p_1 G$ and $P_2 = p_2 G$, then $P_1 + P_2 == (p_1 + p_2)*G$. We should therefore expect that if we sum together enote image commitments (inputs) and sum together new enote commitments (outputs), then $\sum C'_j - \sum C_t$ will contain no $H_1$ component only if the sum of input amounts equals the sum of output amounts.
 
@@ -343,7 +343,7 @@ The maximum number of elements $n$ that can be summed together must be $n < l / 
 
 In a real system based on Seraphis, only new enote commitments need range proofs, not enote image commitments (see Appendix \ref{appendix:squashed-enote-model} for an exception). If all new enotes added to the ledger are range proofed, and membership proofs only reference enotes from the ledger, then enote image commitments are guaranteed (within a security factor) to contain legitimate amounts.
 
-Finally, note that range proofing a commitment `locks in' the structure $C = x H_0 + a H_1$. This means in any membership proof that acts on only range proofed commitments, it must be the case that $a_{\pi,x} == 0$ for $x \geq 2$.
+Finally, note that range proofing a commitment `locks in' the structure $C = x H_0 + a H_1$. This means in any membership proof that acts on only range proofed commitments, it must be the case that $a_{\pi,q} == 0$ for $q \geq 2$.
 
 
 \subsection{Transaction teleology}

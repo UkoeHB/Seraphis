@@ -130,7 +130,7 @@ Let $\mathbb{S}^t$ be the input to the underlying model. We will show that the f
 \begin{enumerate}
     \item Demonstrate that, within a security parameter $k$, $\tilde{S}$ corresponds to some $S^t_{\pi} \in \mathbb{S}^t$, where $\pi$ is unknown to the verifier, such that:
     \begin{enumerate}
-        \item $s'_j == \mathcal{H}_1(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$
+        \item $s'_p == \mathcal{H}_1(K_{\pi}, C_{\pi})*s_{\pi,p}$ for $p \in 1,...,n$
         \item $a'_1 == a_{\pi,1}$
     \end{enumerate}
 \end{enumerate}
@@ -140,9 +140,9 @@ Observe the following.
 \begin{enumerate}
     \item The prover must know $[(z' + x') - (\mathcal{H}_1(K_{\pi}, C_{\pi})*z_{\pi} + x_{\pi})]$ and $z'$ to satisfy the squashed enote model, and $x'$ and $x_{\pi}$ to construct the range proofs on $C'$ and $C^t_{\pi}$. Therefore the prover must know $\mathcal{H}_1(K_{\pi}, C_{\pi})*z_{\pi}$. The value $\mathcal{H}_1(K_{\pi}, C_{\pi})$ is considered `public knowledge', so the prover must also know $z_{\pi}$ (which may be 0).
 
-    \item Range proofing $C_{\pi}$ and $C'$ means they have the form $x H_0 + a H_1$, implying they contain no $G_1,...,G_n$ components. Therefore, demonstrating discrete log with respect to $G_0$ in the commitment to zero $\tilde{Q} - Q_{\pi}$ means it must be the case that $s'_j == \mathcal{H}_1(K_{\pi}, C_{\pi})*s_{\pi,j}$ for $j \in 1,...,n$ (i.e.\ all factors of $G_1,...,G_n$ in $\tilde{Q}$ and $K'$ must come from $K_{\pi}$).
+    \item Range proofing $C_{\pi}$ and $C'$ means they have the form $x H_0 + a H_1$, implying they contain no $G_1,...,G_n$ components. Therefore, demonstrating discrete log with respect to $G_0$ in the commitment to zero $\tilde{Q} - Q_{\pi}$ means it must be the case that $s'_p == \mathcal{H}_1(K_{\pi}, C_{\pi})*s_{\pi,p}$ for $p \in 1,...,n$ (i.e.\ all factors of $G_1,...,G_n$ in $\tilde{Q}$ and $K'$ must come from $K_{\pi}$).
 
-    \item Suppose $K_i$ has the form $K_i = z_i G_0 + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n + e H_1$. Since the model requires a demonstration that $K'$ does not contain any $H_1$ components, and the commitment to zero $\tilde{Q} - Q_{\pi}$ means all non-$G_0$ components balance in those two points, it must be the case that $C' = x' H_0 + (a_{i,1} + \mathcal{H}_1(K_{\pi}, C_{\pi})*e)*H_1$. However, the term $\mathcal{H}_1(K_{\pi}, C_{\pi})$ is both uniformly distributed and implicitly dependent on the values $a_{i,1}$ and $e$, so the value $a'_1 = (a_{i,1} + \mathcal{H}_1(K_{\pi}, C_{\pi})*e)$ will be uniformly distributed in $\mathbb{Z}_l$ (assuming $e$ is non-zero). Since the range proof on $C'$ means that $a'_1$ must be in the range $[0,...,2^z - 1]$, if $e \neq 0$ then the probability that a range proof on $a'_1$ can succeed is $2^z/l$. This means $a'_1 == a_{i,1}$ can be assumed to be true within the security parameter $k$ if $1/k > 2^z/l$.\footnote{Typically $l \approx 2^{252} - 2^{256}$, $2^z = 2^{64}$, and $k = 2^{128}$; $1/2^{128} > 2^{64}/2^{252}$ is true.} [[[formalize better?]]]
+    \item Suppose $K_i$ has the form $K_i = z_i G_0 + s_{i,1} G_1 + s_{i,2} G_2 + ... + s_{i,n} G_n + e H_1$. Since the model requires a demonstration that $K'$ does not contain any $H_1$ components, and the commitment to zero $\tilde{Q} - Q_{\pi}$ means all non-$G_0$ components balance in those two points, it must be the case that $C' = x' H_0 + (a_{\pi,1} + \mathcal{H}_1(K_{\pi}, C_{\pi})*e)*H_1$. However, the term $\mathcal{H}_1(K_{\pi}, C_{\pi})$ is both uniformly distributed and implicitly dependent on the values $a_{\pi,1}$ and $e$, so the value $a'_1 = (a_{\pi,1} + \mathcal{H}_1(K_{\pi}, C_{\pi})*e)$ will be uniformly distributed in $\mathbb{Z}_l$ (assuming $e$ is non-zero). Since the range proof on $C'$ means that $a'_1$ must be in the range $[0,...,2^z - 1]$, if $e \neq 0$ then the probability that a range proof on $a'_1$ can succeed is $2^z/l$. This means $a'_1 == a_{\pi,1}$ can be assumed to be true within the security parameter $k$ if $1/k > 2^z/l$.\footnote{Typically $l \approx 2^{252} - 2^{256}$, $2^z = 2^{64}$, and $k = 2^{128}$; $1/2^{128} > 2^{64}/2^{252}$ is true.} [[[formalize better?]]]
 \end{enumerate}
 
 \subsubsection{Seraphis structure}
@@ -150,7 +150,7 @@ Observe the following.
 \begin{enumerate}
     \item A range proof on $C_i$ is equivalent to a range proof on $C^t_i$, since $C^t_i = C_i$. These range proofs will already exist, since membership proofs only reference enotes in the ledger (which were created by transactions whose output enotes' amount commitments were range proofed, or are coinbase enotes whose amounts are known).
 
-    \item Seraphis linking tags are computed from the output of a membership proof, namely the point $K'$ in $\tilde{S}$. However, $K'$ in the squashed enote model applied to Seraphis has the form $K' = t_k G_0 + \mathcal{H}_1(K^o_{\pi}, C_{\pi})*[k^o_a*G_1 + k^o_b*G_2]$. This means linking tags will have the form $\tilde{K} = ((\mathcal{H}_1(K^o_{\pi}, C_{\pi})*k^o_b)/(\mathcal{H}_1(K^o_{\pi}, C_{\pi})*k^o_a))*J$. Since the terms $\mathcal{H}_1(K^o_{\pi}, C_{\pi})$ cancel each other, linking tags in this model are the same as in the base model.
+    \item Seraphis linking tags are computed from the output of a membership proof, namely the point $K'$ in $\tilde{S}$. However, $K'$ in the squashed enote model applied to Seraphis has the form $K' = t_k G_0 + \mathcal{H}_1(K^o_{\pi}, C_{\pi})*[k^o_0*G_0 + k^o_1*G_1 + k^o_2*G_2]$. This means linking tags will have the form $\tilde{K} = ((\mathcal{H}_1(K^o_{\pi}, C_{\pi})*k^o_2)/(\mathcal{H}_1(K^o_{\pi}, C_{\pi})*k^o_1))*J$. Since the terms $\mathcal{H}_1(K^o_{\pi}, C_{\pi})$ cancel each other, linking tags in this model are the same as in the base model.
 
     \item Step 10 in the above model is automatically satisfied by Seraphis because $K'$ is passed as input to the ownership/unspentness proof system, which demonstrates knowledge of the per-generator discrete log relations of its inputs.
 \end{enumerate}
@@ -166,7 +166,7 @@ Transaction verifiers can pre-compute steps 3 and 6 from the above model for eve
 \section{Grootle proof}
 \label{appendix:grootle-proof}
 
-We present a Groth/Bootle one-of-many proof \cite{groth-one-out-of-many, bootle-one-of-many} that satisfies the membership proof requirements of the squashed enote model (Appendix \ref{appendix:squashed-enote-model}). The proof construction is a degenerate form of the one-of-many proof in Appendix B of the Lelantus-Spark paper \cite{lelantus-spark}, so we have adapted their description and security proof largely verbatim.
+We present a Groth/Bootle one-of-many proof \cite{groth-one-out-of-many, bootle-one-of-many, matrict} that satisfies the membership proof requirements of the squashed enote model (Appendix \ref{appendix:squashed-enote-model}). The proof construction is a simplified form of the one-of-many proof in Appendix B of the Lelantus-Spark paper \cite{lelantus-spark}, so we have adapted their description and security proof largely verbatim.
 
 
 \subsection{Construction}
