@@ -1,0 +1,774 @@
+%\section{Abstract}
+%\label{sec:abstract}
+\begin{abstract}
+    We discuss how Seraphis, a transaction protocol abstraction for p2p electronic cash systems, may be implemented. Specifically, we specify a set of elliptic curve generators, describe a concrete balance proof, explain how coinbase enotes and transaction fees may be integrated into a Seraphis transaction protocol, show how the addressing scheme Jamtis satisfies requirements set by the Seraphis abstraction, provide recommendations for optimizing a transaction protocol design, and explore nuances related to the process of constructing transactions. We also introduce a comprehensive set of information proofs for Jamtis-based transactions.
+\end{abstract}
+
+
+\section{Introduction}
+\label{sec:introduction}
+
+Seraphis \cite{seraphis} is a transaction protocol abstraction, and hence does not specify any concrete implementation details. To that end, we discuss how to implement various components of a Seraphis-compatible protocol. The highlights of our design recommendations are as follows.
+
+\begin{enumerate}
+    \item Jamtis \cite{jamtis} is a Seraphis-compatible addressing scheme that enables full balance recovery without the master spend key, supports a third-party balance recovery process with substantially better privacy than third-party scanning with CryptoNote view keys, eliminates the `duplicate onetime address' and `subaddress look-ahead' issues that plague the CryptoNote addressing scheme, and provides conditional forward-secrecy against a DLP-solver (e.g.\ quantum adversary).
+    \item Membership proofs may be constructed after a transaction has been signed. This makes multisignatures simpler and more robust, and enables `transaction chaining' where it is possible to construct a partial transaction B that spends an enote from transaction A before A has been added to the ledger (Section~\ref{sec:modular-tx-building}).
+\end{enumerate}
+
+Appendix \ref{appendix:jamtis-information-proofs} presents a comprehensive set of information proofs for Jamtis-based Seraphis transactions (e.g.\ address ownership proofs, reserve proofs, etc.). Appendix \ref{appendix:matrix-proof} presents a flexible Schnorr-like proof for key matrices constructed from sets of private keys and base keys, which is used in the information proofs.
+
+
+\subsection{Acknowledgements}
+\label{subsec:intro-acknowledgements}
+
+We would like to thank tevador for his work as the lead author of Jamtis \cite{jamtis}, Justin Berman and Luke Parker for their feedback and contributions to Jamtis, and dangerousfreedom for his contributions to the Jamtis information proofs.
+
+
+
+\section{Preliminaries}
+\label{sec:preliminaries}
+
+\subsection{Public parameters}
+\label{subsec:preliminaries-public-parameters}
+
+\footnote{Parts of this section were copied mostly verbatim from the Triptych preprint \cite{triptych-preprint}.}Let $\mathbb{G}$ be a cyclic group of prime order $l > 3$ in which the discrete logarithm problem is hard and the decisional and inverse decisional Diffie-Hellman assumptions hold, and let $\mathbb{Z}_l$ be its scalar field. Let $\mathcal{H}: [0,1]^*$ and $\mathcal{H}^n [0,1]^* \to \mathbb{Z}_l$ be cryptographic hash functions. We add a subscript to hash functions, such as $\mathcal{H}_{src}$, in lieu of domain-separating explicitly; any domain-separation method may be used in practice (e.g.\ an ASCII string corresponding to a domain-separated use case, such as $\mathcal{H}(``sender\_receiver\_secret"\ ||\ [\textrm{hash input}])$).
+
+We define four distinct generators $G, H, X, U \in \mathbb{G}$ that map to generators from the Seraphis paper. The generator $G$ should be the `main' generator of $\mathbb{G}$ according to the relevant convention, and the other generators should be produced using public randomness.\vspace{.115cm}
+\begin{align*}
+    G &= G_0 = H_0 \\
+    H &= H_1       \\
+    X &= G_1       \\
+    U &= G_2 = J
+\end{align*}
+
+We also define an isometric cipher and decipher functions {\tt Ciph} and {\tt Deciph} [terminology? notation?].
+
+All public parameters are assumed to comprise a global reference string known to all players. For readability, we generally exclude explicit reference to public parameters in algorithm definitions and Fiat-Shamir transcript hashes.
+
+
+\subsection{Notation}
+\label{subsec:preliminaries-notation}
+
+\begin{itemize}
+    \item We use additive notation for group operations on $\mathbb{G}$. This means, for example, that the binary group operation between $G$ and $H$ is denoted $G + H$.
+
+    \item This paper contains no exponentiation unless explicitly stated. Superscripts such as the $o$ in $k^o$ are in most cases merely for descriptive purposes and have no mathematical significance.
+
+    \item For group element $P$ and scalar $x \in \mathbb{Z}_l$, $x P$ and $x*P$ both indicate scalar multiplication. The use of asterisks ($*$) in some places but not others is meant to aid visual clarity where appropriate (usually when multiplying by a parenthesized scalar or by a scalar that has a superscript).
+
+    \item Modular multiplicative inverse group operations use the notation $(1/x)*P$.
+
+    \item Tuples are indicated with brackets, e.g.\ $[A, B, C]$. To avoid confusion, we always explicitly refer to tuples as tuples wherever they appear (e.g.\ `the tuple $[A, B, C]$').
+\end{itemize}
+
+
+\subsection{Squashed enote model}
+\label{subsec:preliminaries-squashed-enote-model}
+
+We use \{\ul{this syntax}\} to highlight text that is specific to the Seraphis squashed enote model.
+
+
+
+\section{Applying the generators}
+\label{sec:applying-generators}
+
+Using the generators defined in Section \ref{subsec:preliminaries-notation}, an enote will look like this:
+
+\begin{itemize}
+    \item \textbf{Amount commitment}: $C = x G + a H$
+    \item \textbf{Address}: $K^o = k_0*G + k_1*X + k_2*U$
+    \item \textbf{Memo}: An arbitrary memo field.
+\end{itemize}
+
+We use Jamtis to specify how an enote should be constructed in Section \ref{subsec:jamtis-enote-construction}.
+
+An enote-image will look like this:
+
+\begin{itemize}
+    \item \textbf{Masked commitment}: $C' = (t_c + x)*G + a H$
+    \item \textbf{Masked address}: $K' = (t_k + k_0)*G + k_1*X + k_2*U$
+    \item \textbf{Key image}\footnote{A key image is a style of `linking tag' characterized by being derived from an enote's address key.}: $\tilde{K} = (k_2/k_1)*U$
+\end{itemize}
+
+
+
+\section{Balance proofs}
+\label{sec:balance-proofs}
+
+For amount balance proofs, we use a non-zero `blinding factor remainder' $p_r$, and publish it inside transactions.\footnote{An alternative to adding $p_r$ to transactions explicitly would be creating a signature on the public key $p_r G$ (as done in Lelantus-Spark \cite{lelantus-spark}). This can prevent problem 2 from Section \ref{subsec:confidential-transactions-sender-receiver-anonymity}. However, if proof structures resilient to problem 2 are used, we do not think signing $p_r G$ offers any advantages (problem 1 is unrelated to $p_r$).} Using $p_r > 0$ avoids requiring interdependency between enote images. Any range proof construction may be used that satisfies [todo: xyz requirements] (e.g. Bulletproofs+ \cite{bulletproofs_plus}).
+
+\subsection{Constructing a balance proof}
+\label{subsec:balance-proofs-construction}
+
+Suppose a transaction spends $j \in 1,...,m$ old enotes and creates $t \in 1,...,p$ new ones. A balance proof involves the following steps.
+
+\begin{enumerate}
+    \item Let the masked commitments in enote-images be denoted $C'_j = v_{c,j} G + a_j H$. Let the commitments in new enotes be denoted $C_t = y_t G + b_t H$.
+
+    \item For $j \in 1,...,m$, randomly select $v_{c,j} \in_R \mathbb{Z}_l$. For $t \in 1,...,p$, randomly select $y_t \in_R \mathbb{Z}_l$.
+
+    \item Compute $p_r = [\sum^{m}_{j=1} v_{c,j}] - [\sum^{p}_{t=1} y_t]$.
+
+    \item Produce a range proof for each new amount commitment $C_t$ \{\ul{and each masked amount commitment $C'_j$}\} for the allowed amount range $[0,2^z)$.\footnote{The value $z$ must be lower than the order $l$ of $\mathbb{G}$ minus a security factor $k < \textrm{log}_2(l)$: $0 \leq z < \textrm{log}_2(l) - k$.}
+\end{enumerate}
+
+Record all $\{C'_j, C_t, p_r, \textrm{range proofs}\}$ in a transaction.
+
+\textbf{Note}: As required by Seraphis, the values $t_{c,j} = v_{c,j} - x_j$ will be uniformly distributed because $v_{c,j}$ are generated randomly and $x_j$ are former $y_t$ values that were also randomly generated.
+
+
+\subsection{Verifying a balance proof}
+\label{subsec:balance-proofs-verification}
+
+To verify a balance proof, perform the following steps.
+
+\begin{enumerate}
+    \item Check that $\sum C'_j == \sum C_t + p_r$ holds.
+
+    \item Check that each $C_t$ \{\ul{and each $C'_j$}\} has a valid range proof.
+\end{enumerate}
+
+If the above checks hold for the transaction, then, within a security factor, there must be a balance on generators $G$ and $H$ in the two commitment sets (input enote-image commitments and output enote commitments).
+
+In conclusion, the amounts must balance between input and output enotes.
+
+
+\subsection{Sender-receiver anonymity}
+\label{subsec:confidential-transactions-sender-receiver-anonymity}
+
+If a transaction only has one input ($m = 1$) and all its outputs' $y_t$ are known by an observer (e.g.\ because they received all enotes produced by the transaction), then the observer will know the value $v_{c,1} = \sum^{p}_{t=1} y_t + p_r$.
+
+However, even if the observer is the original sender of the enote that the transaction author is spending, they won't necessarily know any more information about the transaction's input than if they weren't the original sender.
+
+First note that the observer, by knowing all $y_t$, will presumably also know the total amount output by the transaction (assuming they know the transaction fee, if relevant), and hence will know the input amount $a_1$.
+
+Second, even if they were the original sender, the input could have been sent to the transaction author by someone else. Despite knowing both $x_1$ and $v_{c,1}$, the observer has no way to know if the real input actually had a different blinding factor $x'_1$, since $t_c$ is uniformly distributed at random.
+
+There are two problems to consider.
+\begin{enumerate}
+    \item If the amount $a_1$ is `unusual' (i.e.\ unlikely to have been created by someone else), then the observer can guess with high probability of success that they created the enote being spent, assuming that enote was referenced by the input's membership proof. This problem may extend to multi-input transactions if the `low bits' of the total amount are unusual (e.g.\ because one input has a fingerprint recorded in low bits of its amount value, and other inputs' amounts have low bits set to zero).
+
+    Even if the amount isn't unusual, if the anonymity set size of membership proofs is relatively small, then there is a very low probability that the observer's enote was randomly selected as a decoy and just happened to have the same amount as the real enote being spent.
+
+    \item If $t_{c,1}$ is used as a secret input to a proof (e.g.\ a discrete log proof of the commitment to zero $C' - C$ with respect to $G$), then the observer may be able to guess and check the proof structure with known values of $x_1$ to see if $t_{c,1} = \sum^{p}_{t=1} y_t + p_r - x_1$ is in fact that secret input (depending on the proof structure used).\footnote{For an example of where this can be a problem, CLSAG \cite{clsag-eprint} and Triptych \cite{triptych-preprint} both require `extra' key images computed like $t_c P$ (where $P$ is public information). This means if the observer knows the input commitment blinding factor (and all output commitment blinding factors), then they can identify the true spend of a 1-input transaction via guess-and-check.}
+\end{enumerate}
+
+Both problems are mitigated or solved by including a `change enote' in each transaction, even if its amount must be zero.\footnote{There are niche cases where the first problem is unsolvable. For example, the sender could allow a `low bit' fingerprint to propagate from an input to an output. The observer may also be able to infer, by the mere fact an enote he created was referenced by a membership proof, that his enote is being spent.} A change enote is an enote the transaction author sends to himself if the total output amount of his transaction exceeds the amount he intends to send to other people (unavoidable if no combination of owned enotes' amounts equals the intended total output amount of his transaction).
+
+
+
+\section{Input proofs}
+\label{sec:input-proofs}
+
+Membership proofs may be implemented with any cryptographic proof that satisfies the Seraphis protocol's requirements. For example, a Grootle proof \cite{seraphis} in the squashed enote model, or a Lelantus-Spark one-of-many proof \cite{lelantus-spark} in the base enote model.
+
+Ownership/unspentness proofs may likewise be implemented with any proof satisfying the Seraphis protocol's requirements. For example, a Seraphis composition proof \cite{seraphis}.
+
+
+
+\section{Coinbase enotes}
+\label{sec:coinbase-enotes}
+
+For a cryptocurrency to be widely adopted, observers should be able to verify that the total supply of money matches their expectations based on coinbase enotes and transactions recorded in the ledger.\footnote{Observers should also expect that coinbase enotes only appear in the ledger when well-defined rules have been satisfied (e.g.\ they were created in the genesis block, or via PoW/PoS mining).}
+
+Let coinbase enotes have a special format. Instead of recording amount commitments, they should record the amounts in cleartext. For a coinbase enote to be referenced in a membership proof's input set $\mathbb{S}$, it must be `converted' into a normal enote first.
+
+Converting a coinbase enote to a normal enote is very simple.
+\begin{itemize}
+    \item Set the enote's address equal to the coinbase enote's address: $K^o_{enote} = K^o_{coinbase}$.
+    \item Set the enote's commitment equal to an unmasked commitment to the coinbase enote's amount $a$: $C_{enote} = a H$.
+\end{itemize}
+
+When a transaction's membership proof references enotes in the ledger, it is common to reference them by index. Verifiers look up those indices, then \{\ul{squash and}\} copy the enotes they find into $\mathbb{S}$. If a verifier finds a coinbase enote at a lookup index, they should convert it into a normal enote before \{\ul{squashing it and}\} copying it into $\mathbb{S}$.\footnote{In practice, transaction verifiers can store converted coinbase enotes directly in/alongside a local copy of the ledger, so they don't have to be converted each time they are referenced by a transaction.}
+
+If a transaction spends a coinbase enote, then its enote-image's masked amount commitment will hide the amount involved even though the original amount had no blinding factor.
+
+
+
+\section{Transaction fees}
+\label{sec:transaction-fees}
+
+Most cryptocurrencies have a `transaction fee'. Each transaction must send a small fee to a third-party. Fees disincentivize creating large numbers of transactions that excessively burden the network and node operators. They also allow transaction authors to prioritize their transactions. Transactions with high fees will typically be added to the ledger faster than those with low fees if the p2p network is congested.
+
+To ensure fees are publicly verifiable, they are usually recorded in cleartext in transactions. Fees are then converted into enotes and added to the ledger at a later date. The rules around this conversion process are minutiae defined by each cryptocurrency.\footnote{In PoW cryptocurrencies, a block's miner typically adds the fee amounts from their block's transactions into their coinbase enotes (the outputs of their `miner transaction') as part of their block reward (which usually includes newly minted money).}
+
+Fees must be incorporated into amount balances. Transaction verifiers can use the following simple procedure.
+
+\begin{enumerate}
+    \item Convert a transaction's fee amount $f$ into an unmasked commitment: $f H$. Require that $0 \leq f < 2^z$.
+    \item Test that the transaction's amounts balance:\vspace{.115cm}
+    \[\sum_j C' \stackrel{?}{=} \sum_t C + p_r + f H\]
+\end{enumerate}
+
+
+
+\section{Jamtis}
+\label{sec:jamtis}
+
+In cryptocurrencies, money may be transferred to another person by submitting a transaction to the p2p network. The transaction should spend money owned by the transaction author and contain new enotes  owned by the recipients of that money. Ownership is implemented by constructing enotes using the `addresses' of intended owners. An enote can only be spent when the owning address's private keys are known. Jamtis \cite{jamtis} is a Seraphis-compatible address scheme with various useful properties that will be explored throughout this section.
+
+
+\subsection{Jamtis private keys and public addresses}
+\label{subsec:jamtis-private-keys-public-addresses}
+
+Jamtis addresses are derived from a hierarchy of private keys. The utility of this hierarchy will be discussed in Section \ref{subsec:jamtis-wallets}.
+
+\subsubsection{Jamtis core}
+\label{subsubsec:jamtis-core}
+
+Jamtis begins with two root private keys.\footnote{The view-balance key is not required to be derived from the master key for two primary reasons. Firstly, users may have pre-existing key pairs that they want to re-use in Seraphis. Secondly, in multisignature schemes it is not feasible to derive anything from the master key since no single party knows its full value.}
+\begin{itemize}
+    \item \textbf{Master key}: $k_m \in_R \mathbb{Z}_l$
+    \item \textbf{View-balance key}: $k_{vb} \in_R \mathbb{Z}_l$
+\end{itemize}
+
+From the view-balance key we derive the following:\footnote{The Jamtis keys $k_{fr}, k_{ua}, K^j_2, K^j_3$ may be defined on a separate elliptic curve from $\mathbb{G}$, for example with X25519 for maximized ECDH performance. For simplicity in this document we assume the primary curve $\mathbb{G}$ is used. If those keys are defined on a group with cofactor $h > 1$, then the cofactor should be included as a scalar multiplier in sender receiver secrets, for example $K_d = h * k_{fr} * K_e$. If this is not done, then a malicious transaction author can determine if the recipient's relevant ECDH secret key is a multiple of $h$ (or any divisor of $h$) or not. They only need to set, for example, $K_e = K_e + K^{hf}$, where $K^{hf}$ is a point in the subgroup of order $h$ (or a factor of $h$). If the recipient successfully performs balance recovery on the enote and notifies the sender, then the sender will know that $k_{fr}$ is a multiple of the subgroup order of $K^{hf}$. This is because $k_{fr} * K^{hf} == I$ when $k_{fr}$ is a multiple of $K^{hf}$'s subgroup's order, allowing the recipient to successfully reproduce $K_d$ only in that case. Including $h$ in sender-receiver secrets means cofactor-subgroup points will always be `canceled out' if they are present in ECDH base keys.}
+\begin{itemize}
+    \item \textbf{Find-received key}: $k_{fr} = \mathcal{H}^n_{fr}(k_{vb})$
+    \item \textbf{Unlock-amounts key}: $k_{ua} = \mathcal{H}^n_{ua}(k_{vb})$
+    \item \textbf{Generate-address secret}: $s_{ga} = \mathcal{H}_{ga}(k_{vb})$
+    \item \textbf{Cipher-tag secret}: $s_{ct} = \mathcal{H}_{ct}(s_{ga})$
+\end{itemize}
+
+We now compute the base public keys from which Jamtis addresses will be built:
+\begin{itemize}
+    \item \textbf{Base spend pubkey}: $K_s = k_{vb} X + k_m U$
+    \item \textbf{Unlock-amounts pubkey}: $K_{ua} = k_{ua} G$
+    \item \textbf{Find-received pubkey}: $K_{fr} = k_{fr} K_{ua}$
+\end{itemize}
+
+\subsubsection{Jamtis public addresses}
+\label{subsubsec:jamtis-public-addresses}
+
+Jamtis public addresses are derived from the Jamtis private keys and base public keys, and a user-defined `address index' $j \in \{0,1\}*$. The address index is ciphered and included alongside the public address keys.
+
+At the heart of a Jamtis public address is an `address-index generator' secret:\vspace{.115cm}
+\[ s^j_{gen} = \mathcal{H}_{gen}(s_{ga} || j) \]
+
+From the generator secret we derive three spendkey extensions\vspace{.115cm}
+\begin{align*}
+    k^j_g &= \mathcal{H}^n_{seg}(K_s || j || s^j_{gen}) \\
+    k^j_x &= \mathcal{H}^n_{sex}(K_s || j || s^j_{gen}) \\
+    k^j_u &= \mathcal{H}^n_{seu}(K_s || j || s^j_{gen})
+\end{align*}
+
+and one address private key:
+\[ k^j_a = \mathcal{H}^n_{ap}(K_s || j || s^j_{gen}) \]
+
+The rationale for binding to $j$ twice (directly and via $s^j_{gen}$) and to $K_s$ is discussed in Appendix \ref{appendix:jamtis-information-proofs-address-index}.
+
+We define the Jamtis public address keys as follows:\vspace{.115cm}
+\begin{align*}
+    K^j_1 &= k^j_g G + k^j_x X + k^j_u U + K_s \\
+    K^j_2 &= k^j_a * K_{fr} \\
+    K^j_3 &= k^j_a * K_{ua}
+\end{align*}
+
+The index is ciphered as $c^j = {\tt Ciph}[s_{ct}](j)$ and prepended to a `decipher hint' to give the address tag:\footnote{The Jamtis address tag decipher hint only needs to be 1-2 bytes in size to be effective.}
+\[ \textrm{\tt addr\_tag}^j = c^j\textrm{ $||$ }\mathcal{H}_{dch}(s_{ct} || c^j) \]
+
+A full Jamtis public address is the tuple $[K^j_1, K^j_2, K^j_3, \textrm{\tt addr\_tag}^j]$.
+
+
+\subsection{Jamtis sender-receiver secret derivation}
+\label{subsec:jamtis-sender-receiver-secret-derivation}
+
+Enote owners would like to discover the enotes they own in the ledger, read the amounts in those enotes, reconstruct commitments in order to perform balance proofs in new transactions, and learn enough secret key material in enote addresses so they can construct key images.
+
+The answer first pioneered by CryptoNote \cite{cryptoNoteWhitePaper} for privacy-focused transaction protocols depends on a Diffie-Hellman shared secret between the sender and receiver of an enote. Jamtis evolves that approach by using one Diffie-Hellman shared secret $K_d$ and two high-level sender-receiver shared secrets $s^{sr}_1, s^{sr}_2$. The two high-level secrets are derived together using two separate derivation paths depending on the enote type.
+
+\subsubsection{Diffie-Hellman derived key $K_d$}
+\label{subsubsec:jamtis-srsecret-DH-derived-key}
+
+At the core of Jamtis enote construction is an enote ephemeral private key $r \in_R \mathbb{Z}_l$ and associated enote ephemeral public key $K_e$. The value $K_e$ is recorded alongside a Jamtis enote for use by the enote's owner.
+
+As we will see, an enote owner can always use their find-received key $k_{fr}$ with $K_e$ to recover the Diffie-Hellman derived key $K_d$:
+\[ K_d = k_{fr} K_e \]
+
+There are two possible ways to compute $K_e$ and $K_d$ during transaction construction.
+
+\textbf{Standard}
+
+For most enotes, $K_e$ and $K_d$ will be computed directly from the recipient's address keys.\vspace{.115cm}
+\begin{align*}
+    K_e &= r K^j_3 \\
+    K_d &= r K^j_2
+\end{align*}
+
+In this case, $K_d = r K^j_2 = r k_{fr} K^j_3 = k_{fr} K_e$.
+
+\textbf{Shared-$K_e$ optimization}
+
+If a transaction contains one recipient and one additional enote sending funds to the transaction author (e.g.\ a leftover/change amount from the difference between inputs, the one recipient, and the transaction fee), then that additional `selfsend' enote can share the other enote's $K_e$.
+
+In this case, the transaction author knows his own $k_{fr}$ key, so he can define the following:\vspace{.115cm}
+\begin{align*}
+    K^{\textrm{self}}_e &= K^{\textrm{other}}_e \\
+    K_d                   &= k_{fr} * K^{\textrm{self}}_e
+\end{align*}
+
+which ensures he can properly recompute $K_d$ during balance recovery.
+
+A transaction that uses the shared-$K_e$ optimization only needs to store one copy of $K_e$.\footnote{A major advantage of sharing $K_e$ is you only need to derive $K_d$ once instead of twice. If most transactions in the ledger have two outputs, and all two-output transactions use the shared-$K_e$ optimization, then there will be a substantial reduction in $K_d$ computations relative to a scenario with no $K_e$ sharing.}
+
+\subsubsection{Secret uniqueness: {\tt input\_context}}
+\label{subsubsec:jamtis-srsecret-secret-uniqueness}
+
+To ensure uniqueness of enote components between transactions, we will bind the secret $s^{sr}_1$ to the `input context' of the transaction it will be used in. Transaction inputs are never repeated in the ledger, which guarantees uniqueness of $s^{sr}_1$ even if $r$ is repeated.
+
+\begin{itemize}
+    \item \textbf{Coinbase txs}: ${\tt input\_context} = \mathcal{H}_{icc}({\tt block\_height})$
+    \item \textbf{Normal txs}: ${\tt input\_context} = \mathcal{H}_{icn}(\tilde{K}_1 || ... || \tilde{K}_m)$
+\end{itemize}
+
+To further ensure uniqueness {\em within} a transaction, transaction verifiers must mandate that all values $K_e$ in a transaction are unique (with a further caveat for selfsend enotes mentioned in Section \ref{subsubsec:jamtis-srsecret-derivation-selfsend}).\footnote{It is safe for multiple $K_e$ in a transaction to be cofactor-variants of the same point, since we bind $s^{sr}_1$ to the byte-wise representation of $K_e$.}
+
+\subsubsection{Secrets $s^{sr}_1, s^{sr}_2$ (derivation path 1): normal enotes}
+\label{subsubsec:jamtis-srsecret-derivation-normal}
+
+For normal enotes that transfer funds to another person, the two sender-receiver secrets $s^{sr}_1, s^{sr}_2$ are derived from $K_d$ and $r$.
+
+\textbf{Sender}
+\begin{align*}
+    s^{sr}_1 &= \mathcal{H}_{sr1n}(K_d || K_e || \texttt{input\_context}) \\
+    s^{sr}_2 &= \mathcal{H}_{sr2n}(r * G)
+\end{align*}
+
+\textbf{Recipient}
+\begin{align*}
+    s^{sr}_1 &= \mathcal{H}_{sr1n}(K_d || K_e || \texttt{input\_context}) \\
+    s^{sr}_2 &= \mathcal{H}_{sr2n}((1/(k^j_a * k_{ua})) * K_e)
+\end{align*}
+
+The second secret $s^{sr}_2$ is computed from an `inverse' Diffie-Hellman exchange involving the recipient's address key $K^j_3 = (k^j_a * k_{ua})*G$. The usefulness of $s^{sr}_2$ will be explored in Sections \ref{subsubsec:jamtis-cryptonote-flaws-janus} and \ref{subsec:jamtis-wallets}.
+
+\subsubsection{Secrets $s^{sr}_1, s^{sr}_2$ (derivation path 2): selfsend enotes}
+\label{subsubsec:jamtis-srsecret-derivation-selfsend}
+
+When sending funds to himself, a transaction author derives the two sender-receiver secrets $s^{sr}_1, s^{sr}_2$ from $K_e$ and his Jamtis key $k_{vb}$. The secrets can be recomputed in the same way during balance recovery.
+
+As we will see in Section \ref{subsubsec:jamtis-wallets-remote-assisted}, providing a separate derivation path for selfsend enotes improves the privacy attributes of balance recovery when $k_{fr}$ is given to a semi-trusted third party.
+
+It is possible to define multiple different selfsend enote types (e.g.\ change enotes, self-spend enotes, dummy selfsend enotes). For convenience, we domain-separate $s^{sr}_1$ based on the different selfsend enote types $\tau$.
+\begin{align*}
+    s^{sr}_1 &= \mathcal{H}_{sr1s[\tau]}(k_{vb} || K_e || {\tt input\_context}) \\
+    s^{sr}_2 &= \mathcal{H}_{sr2s}(k_{vb} || s^{sr}_1)
+\end{align*}
+
+In this case $s^{sr}_2$ does not rely on the inverse Diffie-Hellman secret $r G$, which simplifies the shared-$K_e$ optimization because there is no need for the value $(1/(k^j_a * k_{ua})) * K^{\textrm{other}}_e$ when building the shared-$K_e$ selfsend enote.
+
+\textbf{Uniqueness}: To ensure uniqueness of $s^{sr}_1$ and $s^{sr}_2$ when $K_e$ is shared between two enotes, transaction authors must avoid sharing $K_e$ between two selfsend enotes of the same type. The secrets will be unique in all other cases since the shared-$K_e$ enote is a selfsend, and each selfsend enote type's secrets are domain-separated from secrets of all other enotes types.
+
+\textbf{Optimized design}: Selfsend enote secrets can be computed with three hash operations (including the input context), whereas normal enote secrets require three hash operations, one scalar inversion, and two ECDH exchanges.
+
+
+\subsection{Jamtis enote construction}
+\label{subsec:jamtis-enote-construction}
+
+Jamtis enotes are constructed in a linear fashion from $K_d, s^{sr}_1$, and $s^{sr}_2$.
+
+\subsubsection{Amount commitment and encoded amount}
+\label{subsubsec:jamtis-enote-construction-amount}
+
+In order for an enote's owner to recover the enote amount $a$ and recompute the amount blinding factor $x$, we encode the amount and store it inside the enote along with the amount commitment $C$, and compute $x$ deterministically.\vspace{.115cm}
+\begin{align*}
+    C       &= \mathcal{H}^n_{bf}(s^{sr}_1 || s^{sr}_2)*G + a*H \\
+    a_{enc} &= a \textrm{ \tt  XOR } \mathcal{H}_{ea}(s^{sr}_1 || s^{sr}_2)
+\end{align*}
+
+where $x = \mathcal{H}^n_{bf}(s^{sr}_1 || s^{sr}_2)$ can be recomputed by the enote's owner.
+
+\subsubsection{Onetime address}
+\label{subsubsec:jamtis-enote-construction-onetime-address}
+
+Enote addresses are called `onetime addresses' because they can only be used to produce one key image, and hence should only appear once in the ledger. An enote's onetime address is:\vspace{.115cm}
+\begin{align*}
+    K^o = \mathcal{H}^n_{kog}(K^j_1 || s^{sr}_1 || C)*G &+ \\
+    \mathcal{H}^n_{kox}(K^j_1 || s^{sr}_1 || C)*X &+ \\
+    \mathcal{H}^n_{kou}(K^j_1 || s^{sr}_1 || C)*U &+ K^j_1
+\end{align*}
+
+We will justify the use of three extensions in Section \ref{subsec:jamtis-forward-secrecy-dlp-solver}. We explain why binding the extensions to $K^j_1$ is important in Appendix \ref{appendix:jamtis-information-proofs-enote-ownership}. Onetime addresses do {\em not} bind to $s^{sr}_2$ so they may be efficiently recovered with only one ECDH exchange using $k_{fr}$ (see Section \ref{subsec:jamtis-balance-recovery}).
+
+\textbf{Binding to C for uniqueness}
+
+Onetime addresses are bound to an {\tt input\_context} via $s^{sr}_1$ so that they will be unique in the ledger, however acquiring an input context requires {\em access} to the ledger. If access to the ledger is intermediated by a semi-trusted third party, it is possible for that party to send false input contexts to a person engaging in balance recovery. If that third party collaborates with a transaction author, they could cause the person doing balance recovery to identify owned enotes with duplicate onetime addresses. To mitigate that risk, onetime addresses are bound to the amount commitment $C$, ensuring that even if a person is using falsified input contexts during balance recovery, they will only identify duplicate-$K^o$ enotes that have the exact same amounts. This makes it safe to completely ignore all but the oldest copy of the enote.\footnote{If enotes are associated with memos containing critical information, then ignoring newer duplicate-$K^o$ enotes may not be safe.}\footnote{We keep track of the oldest copy instead of the newest copy in case of ledger reorganizations that remove newer copies but leave older ones untouched.}
+
+\subsubsection{Encrypted address tag}
+\label{subsubsec:jamtis-enote-construction-encrypted-addr-tag}
+
+To facilitate balance recovery, an encrypted version of the Jamtis address tag is recorded in each enote.
+\[ {\tt addr\_tag\_enc} = \textrm{\tt addr\_tag XOR } \mathcal{H}_{ate}(s^{sr}_1 || K^o) \]
+
+We bind to $K^o$ for robustness.\footnote{It is feasible, although unlikely, that $s^{sr}_1$ could be re-used between separate transaction attempts using different recipients. For example, a shared-$K_e$ selfsend could use two different selfsend addresses but the same original recipient and same enote ephemeral private key $r$. In that case, binding to $K^o$ ensures different address tags won't be encrypted using the same secret.}
+
+\subsubsection{View tag}
+\label{subsubsec:jamtis-enote-construction-view-tag}
+
+As a balance recovery optimization, we include a MAC-like hash of $K_d$ called a `view tag' in enotes \cite{reduce-scan-times-view-tag-research-issue-73}. A person doing balance recovery can recompute the view tag for a given enote and check it against the stored view tag. If the view tags don't match then all other balance recovery steps can be skipped (the other steps are quite expensive in total, compared to the ECDH exchange for $K_d$).\footnote{A view tag only needs to be 1 or 2 bytes to effectively amortize post-view-tag computations.}
+\[ {\tt view\_tag} = \mathcal{H}_{vt}(K_d || K^o) \]
+
+We bind to $K^o$ in order to transitively bind to all other components of an enote, ensuring the view tag derivation will never be repeated between two enote construction events.
+
+\subsubsection{Enote summary}
+\label{subsubsec:jamtis-enote-construction-view-tag}
+
+A Jamtis enote sending funds to an address $[K^j_1, K^j_2, K^j_3, \textrm{\tt addr\_tag}^j]$ is therefore the tuple\footnote{A Jamtis coinbase enote will record $a$ explicitly instead of $C$ and $a_{enc}$.}\vspace{.115cm}
+\[ [K^o, C, a_{enc}, {\tt addr\_tag\_enc}, {\tt view\_tag}] \]
+
+The enote is associated with an ephemeral public key $K_e$ and an {\tt input\_context}.
+
+
+\subsection{CryptoNote address scheme flaws}
+\label{subsec:jamtis-cryptonote-address-scheme-flaws}
+
+The Jamtis design we just presented fixes four important flaws in the design of the CryptoNote address scheme.
+
+\subsubsection{Onetime address duplication}
+\label{subsubsec:jamtis-cryptonote-flaws-duplication}
+
+CryptoNote enotes in the ledger may contain duplicate onetime addresses even though only one of them may be spent. There are two problems with that situation \cite{burning-bug-mrl-103}.
+\begin{enumerate}
+    \item User wallets must track all duplicates and only consider the enotes with the highest amounts to be spendable. Otherwise users could be tricked into `burning' their own funds.
+    \item Protocols implemented on top of a cryptocurrency with CryptoNote addresses, such as multisignature schemes or atomic swaps, must take extra precautions to ensure money transfers always guarantee spendability of sent funds.
+\end{enumerate}
+
+Jamtis solves the duplication issue by baking an {\tt input\_context} into enotes, as discussed in Section \ref{subsubsec:jamtis-srsecret-secret-uniqueness}.\footnote{A naive solution to prevent duplicate onetime addresses would be to simply ban duplicates from appearing in the ledger. Doing that, however, would enable malicious actors in the network to `kill' in-flight transactions by creating malicious transactions containing the honest transactions' enotes' onetime addresses. If the malicious transactions are confirmed into the ledger then the honest transactions would become invalid.}
+
+\subsubsection{Subaddress lookahead}
+\label{subsubsec:jamtis-cryptonote-flaws-subaddr-lookahead}
+
+A CryptoNote user may generate many `subaddresses' \cite{MRL-0006-subaddresses} from their CryptoNote private keys, in addition to their main CryptoNote public address.\footnote{Subaddresses are an extension on top of CryptoNote, but we consider them part of CryptoNote for simplicity.} Much like Jamtis addresses, each CryptoNote subaddress is derived from a user-defined index.
+
+In CryptoNote balance recovery \cite{cryptoNoteWhitePaper, ztm-2}, users detect an owned enote by `unwrapping' the onetime address to examine the underlying spend key, and then matching that unwrapped key against a table of precomputed subaddresses (plus the main address). If there is a match, then the user owns the enote. However, if an enote is owned by a subaddress not in the precomputed table, then the enote will not be identified as owned. As a consequence, CryptoNote balance recovery is error-prone and it is not feasible to randomly generate subaddresses.
+
+Jamtis encrypted address tags cleanly solve this issue by enabling users to directly recover the address indices of owned enotes during balance recovery. If the index $j$ is sufficiently large then addresses can be randomly generated with only negligible risk of collisions.\footnote{An index space of 128 bits is considered sufficiently large for most use-cases \cite{uuid-rfc4122}.}
+
+\subsubsection{Janus attack}
+\label{subsubsec:jamtis-cryptonote-flaws-janus}
+
+CryptoNote balance recovery involves a two-part process. First is an ECDH exchange using the CryptoNote view key to get a shared secret (much like $K_d$). Then the shared secret is used to unwrap the spend key of the address that owns the enote (similar to $K^j_1$).
+
+Since that two-part process is separated, it is possible for each part to be constructed from a different subaddress. A transaction author can optimistically make an enote from two subaddresses they suspect are owned by the same person. Their theory will be confirmed if that person notifies the author they received the enote. This is called a `Janus attack' \cite{janus-attack}.
+
+Jamtis solves this by binding enote contents to the index $j$ of the recipient address (see Section \ref{subsec:jamtis-balance-recovery} for the entire balance recovery process).
+\begin{enumerate}
+    \item The enote ephemeral key $K_e$ depends on $k^j_a$: $K_e = r K^j_3 = r*(k^j_a * k_{ua})*G$
+
+    \item The recipient recovers index $j$ by decrypting {\tt addr\_tag\_enc} with $K_d = k_{fr} K_e$ (and then deciphering the decrypted address tag).
+
+    \item The recipient recomputes onetime address $K^o$ using $K_s$, $j$, and $K_d$.
+
+    \item The recipient computes the second secret $s^{sr}_2$ from the value $(1/(k^j_a * k_{ua})) * K_e$.
+\end{enumerate}
+
+The key here is in the last point. Specifically, $s^{sr}_2$ depends on both $K_e$ and the recovered $j$. If the recovered $j$ does not match the $j'$ of the key $K^{j'}_3$ used to construct $K_e = r K^{j'}_3$, then the user will compute a different $s^{sr}_2$ from the transaction author.
+
+In detail, the user will compute $s^{sr}_2$ with the ECDH key $(1/(k^j_a * k_{ua})) * K_e = r * (k^{j'}_a/k^j_a) * G$, which the transaction author cannot know since $k^{j}_a$ and $k^{j'}_a$ are secrets. Therefore if a user recovers $s^{sr}_2$ successfully (which can be verified by reproducing $C$ correctly), and assuming $K^o$ was recomputed properly, then the transaction author must have used address components derived from the same index $j$.
+
+The Janus attack is not an issue for Jamtis selfsend enotes since they are constructed with the view-balance key. A person with the view-balance key already has the power to generate all Jamtis addresses and decipher the address tags of existing addresses.
+
+\subsubsection{Incomplete view key}
+\label{subsubsec:jamtis-cryptonote-flaws-view-key}
+
+Due to how CryptoNote key images are defined \cite{cryptoNoteWhitePaper}, they can only be computed using both CryptoNote private keys (the view and spend keys). This means a user cannot use their CryptoNote view key in isolation to identify when their enotes are spent (by computing key images and checking if they are present in the ledger). As such, the view key only has partial view access to a user's balance.
+
+In contrast, Seraphis key images can be computed using the Jamtis view-balance key $k_{vb}$ in combination with the public key $k_m U$.\footnote{In an early version of the Seraphis paper, linking tags had the form $\tilde{K} = (1/(\mathcal{H}(s^{sr}_1) + k_{vb}))*G$. This meant a view-balance wallet could demonstrate the discrete log of $\tilde{K}$ with respect to $G$, allowing them to look at an enote received to the underlying master wallet, extract the linking tag, send a new enote to themselves with the same linking tag, then spend that enote so the linking tag is added to the ledger. The original enote seen by the view-balance wallet would be unspendable (i.e.\ `burnt'). In other words, a view-balance wallet would have the power to destroy enotes owned by the corresponding master wallet, which is sub-optimal (our thanks to Nikolas Kr{\"{a}}tzschmar for identifying this problem). The current linking tag construction prevents that issue by requiring knowledge of $k_m$ in order to demonstrate the linking tag's discrete log.}
+
+
+\subsection{Jamtis balance recovery}
+\label{subsec:jamtis-balance-recovery}
+
+Jamtis balance recovery can be divided into two steps: view tag checks and enote recovery. Enote recovery can occur via the `normal' or `selfsend' paths, which are very similar.
+
+\subsubsection{View tag check and $K_d$}
+\label{subsubsec:jamtis-balance-recovery-view-tag}
+
+Given an enote with associated enote ephemeral key $K_e$ and {\tt input\_context}, a user who wants to see if they own the enote begins by checking its view tag. This requires the user's $k_{fr}$.
+
+\begin{enumerate}
+    \item Compute the nominal key derivation: $K'_d = k_{fr} * K_e$
+
+    \item Compute the nominal view tag: ${\tt view\_tag}' = \mathcal{H}_{vt}(K'_d || K^o)$
+
+    \item If ${\tt view\_tag}' \neq {\tt view\_tag}$ then {\tt ABORT}.
+\end{enumerate}
+
+\subsubsection{Full enote recovery}
+\label{subsubsec:jamtis-balance-recovery-enote}
+
+Once an enote has been flagged as `possibly owned', full enote recovery can proceed. Normal scanning will use the key derivation $K'_d$, while selfsend scanning will test a trial selfsend type $\tau$.
+
+In selfsend scanning, if one $\tau$ fails then other values of $\tau$ can be tried. Selfsend $\tau$ checks are cheap if the address tag hint is sufficiently large because only two hashes are required to test it.
+
+The user first computes $s^{sr}_1$ and recovers the address index $j$.
+\begin{itemize}
+    \item \textbf{Normal scan}: This requires $K'_d$ and the user's $s_{ct}$.
+
+    \item \textbf{Selfsend scan}: This requires the user's $k_{vb}$ and $s_{ct}$.
+\end{itemize}
+
+\begin{enumerate}
+    \item Compute the first enote secret
+    \begin{itemize}
+        \item \textbf{Normal scan}: $s'^{sr}_1 = \mathcal{H}_{sr1n}(K'_d || K_e || \texttt{input\_context})$
+        \item \textbf{Selfsend scan}: $s'^{sr}_1 = \mathcal{H}_{sr1s[\tau]}(k_{vb} || K_e || {\tt input\_context})$
+    \end{itemize}
+
+    \item Compute the nominal address tag: ${\tt addr\_tag}' = \textrm{\tt addr\_tag\_enc XOR } \mathcal{H}_{ate}(s'^{sr}_1 || K^o)$
+
+    \item Split the nominal address tag: ${\tt addr\_tag}' \Rightarrow \{c'^j, {\tt hint}'\}$
+
+    \item If $\mathcal{H}_{dch}(s_{ct} || c'^j) \neq {\tt hint}'$ then {\tt ABORT}.
+
+    \item Decipher the nominal address index: $j' = {\tt Deciph}[s_{ct}](c'^j)$
+\end{enumerate}
+
+With $j'$ in hand, the user can recompute $K^o$. This requires $s'^{sr}_1$ and the user's $s_{ga}$ and $K_s$.
+
+\begin{enumerate}
+    \item Compute the address-index generator of $j'$: $s^{j'}_{gen} =  \mathcal{H}_{gen}(s_{ga} || j')$
+
+    \item Compute the spendkey extensions of $j'$ for $G$, $X$, and $U$: $k^{j'}_{[g/x/u]} = \mathcal{H}^n_{se[g/x/u]}(K_s || j' || s^{j'}_{gen})$
+
+    \item Compute the address spend key of $j'$: $K^{j'}_1 = k^{j'}_g G + k^{j'}_x X + k^{j'}_u U + K_s$
+
+    \item Compute the nominal onetime address extensions: $k'^o_{[g/x/u]} = \mathcal{H}^n_{ko[g/x/u]}(K^{j'}_1 || s'^{sr}_1 || C)$
+
+    \item Compute the nominal onetime address: $K'^o = k'^o_g G + k'^o_x X + k'^o_u U + K^{j'}_1$
+
+    \item If $K'^o \neq K^o$ then {\tt ABORT}.
+\end{enumerate}
+
+Now the user is prepared to recover the enote amount.\footnote{These steps are not required for coinbase enotes, which record the amount $a$ explicitly.}
+\begin{itemize}
+    \item \textbf{Normal scan}: This requires $s'^{sr}_1, j', s^{j'}_{gen}$, and the user's $k_{ua}$ and $K_s$.
+
+    \item \textbf{Selfsend scan}: This requires $s'^{sr}_1$ and the user's $k_{vb}$.
+\end{itemize}
+
+\begin{enumerate}
+    \item Compute the second enote secret:
+        \begin{itemize}
+        \item \textbf{Normal scan}:
+            \begin{enumerate}
+                \item Compute the address private key of $j'$: $k^{j'}_a = \mathcal{H}^n_{ap}(K_s || j' || s^{j'}_{gen})$
+                \item Compute the secret: $s'^{sr}_2 = \mathcal{H}_{sr2n}((1/(k^{j'}_a * k_{ua})) * K_e)$
+            \end{enumerate}
+        \item \textbf{Selfsend scan}: $s'^{sr}_2 =\mathcal{H}_{sr2s}(k_{vb} || s'^{sr}_1)$
+    \end{itemize}
+
+    \item Decrypt the nominal amount: $a' = a_{enc} \textrm{ \tt  XOR } \mathcal{H}_{ea}(s'^{sr}_1 || s'^{sr}_2)$
+
+    \item Compute the nominal amount blinding factor: $x' = \mathcal{H}^n_{bf}(s'^{sr}_1 || s'^{sr}_2)$
+
+    \item If $x' G + a' H \neq C$ then {\tt ABORT}.
+\end{enumerate}
+
+At this point the user is certain they own the enote. As a final step, they can compute the enote's key image. This requires $k^o_x, k^o_u, k^j_x, k^j_u$, and the user's $k_{vb}$ and $k_m U$.\vspace{.115cm}
+\[ \tilde{K} = \frac{1}{k^o_x + k^j_x + k_{vb}} *((k^o_u + k^j_u)*U + k_m U) \]
+
+\subsubsection{Implementing balance recovery}
+\label{subsubsec:jamtis-balance-recovery-implementing}
+
+To actually perform balance recovery, users must examine enotes and key images in the ledger. We discuss an effective procedure for doing so.
+
+First, we add a rule to Jamtis to ensure all transactions containing a user's key images will have at least one output enote that passes the view tag check with that user's $k_{fr}$.
+\begin{itemize}
+    \item \textbf{Rule}: All transactions spending funds from a user's wallet must contain at least one selfsend enote.\footnote{To satisfy this rule, it may be necessary to add a dummy selfsend to a transaction if there is no change enote or explicit self-spend.}
+\end{itemize}
+
+Now we define the balance recovery procedure.
+\begin{enumerate}
+    \item Collect a chronologically contiguous range of transactions from the ledger. We assume the results of scanning all prior transactions have been cached by the user.
+
+    \item Perform view tag checks on those transactions and compute nominal address tags. Collect `basic records' of enotes that pass the checks. A basic record includes the enote, its enote ephemeral public key, its input context, and its nominal address tag. We don't store $K_d$ in basic records in case the source of those records is not trusted.
+
+    Also collect the key images of transactions that contributed enotes to that basic record set.
+
+    \item Perform normal enote scanning on those basic records, starting with trying to decipher the nominal address tag. Then we recompute $K_d$ and re-do the view tag check. After that, proceed normally.
+
+    \item Mark as spent all enotes owned by the user (including cached and newly acquired enotes) whose key images can be found in the transactions that fed enotes to the basic record set. Flag the transactions that contain key image matches.
+
+    \item Loop until there are no flagged transactions:
+    \begin{enumerate}
+        \item Perform full selfsend enote scanning on all basic records associated with the flagged transactions. Full selfsend scanning means testing all selfsend enote types against each basic record. We ignore the basic records' nominal address tags since selfsends have a separate derivation path for $s^{sr}_1$.
+        \item Mark as spent any selfsend enotes from the previous step whose key images can be found in the transactions associated with the basic record set. Flag those transactions (they may contain more selfsends).
+    \end{enumerate}
+\end{enumerate}
+
+With this procedure, we minimize the amount of work and data that needs to be handled by each successive step.
+
+
+\subsection{Jamtis wallets}
+\label{subsec:jamtis-wallets}
+
+The Jamtis key structure and balance recovery design lends itself to a well-defined set of `wallet tiers'.
+
+\begin{itemize}
+    \item \textbf{Find-received} ($k_{fr}$): Perform view tag checks  for all enotes and compute nominal normal-enote address tags.
+
+    \item \textbf{Generate-address} ($s_{ga}, K_s$): Generate any Jamtis address for arbitrary index $j$. Decipher the address index of any existing Jamtis address.
+
+    \item \textbf{Payment validator} ($k_{fr}, s_{ga}, k_{ua}, K_s$): In addition to the find-received and generate-address tier capabilities, the payment validator can perform balance recovery for normal enotes up to (but not including) the key image computation.
+
+    \item \textbf{View-balance} ($k_{vb}, k_m U$): View all balance-related information including for selfsend enotes.
+
+    \item \textbf{Master} ($k_{vb}, k_m$): View the entire user's balance and make ownership/unspentness proofs for all enotes.
+\end{itemize}
+
+Here we see the value of $k_{ua}$, which separates payment validators from the find-received and generate-address wallet tiers.
+
+\subsubsection{Remote-assisted balance recovery}
+\label{subsubsec:jamtis-wallets-remote-assisted}
+
+A user can set up a remote find-received wallet that creates basic records from enotes in the ledger and passes those records to their local view-balance wallet (or payment validator). There are several important details to highlight.
+\begin{itemize}
+    \item A find-received wallet has very limited information about the user's owned enotes.
+    \begin{enumerate}
+        \item It can perform view tag checks on all enotes, which essentially filters down the set of enotes `possibly owned by the user'.
+        \item It can uncover the nominal address tags of normal enotes, which means if the wallet knows about (or ever in the future learns about) addresses owned by the user, then it can identify all normal enotes owned by those addresses.
+    \end{enumerate}
+
+    \item A find-received wallet only has to transmit basic records of enotes that pass view tag checks and key images associated with those enotes to the user. This amounts to a substantial relative reduction in data that a user needs to access compared to the remote wallet, even if view tags are only 8 bits (a 256:1 reduction).
+
+    \item The first step that a user needs to do to process a basic record is check the nominal address tag's hint, which is very cheap compared to the ECDH exchange required to obtain that hint. This means the user will spend very little computational time handling enotes they don't actually own, since hint checks will further filter out a significant proportion of unowned enotes (for a 16-bit hint it would be a 65536:1 reduction).
+
+    \item The user will only look for selfsend enotes in transactions containing the key images of their owned enotes. Moreover, despite the selfsend path needing to decrypt the encrypted address tag before doing a hint check, doing so is very cheap since $s^{sr}_1$ for selfsends is derived from $k_{vb}$ instead of $K_d$. Overall this means checking for selfsends has very low relative computation cost.
+\end{itemize}
+
+The result is highly constrained information access for the remote find-received wallet and near-instantaneous balance recovery for the user.
+
+
+\subsection{Forward secrecy against DLP-solver}
+\label{subsec:jamtis-forward-secrecy-dlp-solver}
+
+Jamtis is designed to offer conditional forward secrecy against a DLP-solver. This includes protecting amounts, the true signers in membership proofs, key image origins, and the identities of enote owners/recipients. Forward secrecy is conditional on the DLP solver not gaining access to a user's public addresses and their generate-address secret.\footnote{Note that tevador, the author of Jamtis, has proposed embedding a post-quantum `switch' into Seraphis that could be activated if a quantum adversary became credible \cite{seraphis-post-quantum-switch}.}
+
+\subsubsection{Public address access}
+\label{subsubsec:jamtis-forward-secrecy-address-access}
+
+A DLP solver with a user's public Jamtis address can recover the user's find-received key and identify all normal enotes owned by that address and their amounts.
+\begin{itemize}
+    \item The adversary can solve for $k_{fr}$ in $k_{fr} K^j_3 = K^j_2$ and use it to unwrap candidate onetime addresses to check if the unwrapped spend keys match the address's $K^j_1$.
+
+    \item The adversary can solve for $r$ in $r K^j_3 = K_e$ to compute the key $r G$, which allows the $s^{sr}_2$ of normal enotes to be computed.
+\end{itemize}
+
+If at least one of those normal enotes is spent, then the DLP solver can additionally compute all of the user's key images. More precisely, they can generate key image candidates derived from all on-chain key images, among which will be the real key images - if two normal enotes are spent then the candidate set collapses.
+\begin{itemize}
+    \item The masked address decomposition of a spent Seraphis enote can be recovered by a DLP solver from the ownership/unspentness proof. This means the values $k^o_x + k^j_x + k_{vb}$ and $k^o_u + k^j_u + k_m$ of the original onetime address will be known to the adversary.
+
+    Suppose the compromised user has spent at most one enote owned by each address known to the adversary. The adversary can use the decomposition values from all proofs in the ledger in combination with the $k^o_x, k^o_u$ of that user's normal enotes to uncover nominal values $k^j_x + k_{vb}$ and $k^j_u + k_m$ for each spent enote in the ledger. Some of those pairs will correspond to the user's spent enotes. He can then combine those pairs with the $k^o_x, k^o_u$ of other normal enotes owned by addresses known to him to compute sets of candidate key images, among which will be the real ones for all of the compromised enotes.
+
+    However, if two enotes are spent out of the user's compromised enote set for a particular address, then the adversary will recover the same pair $k^j_x + k_{vb}$ and $k^j_u + k_m$ from both of those enotes, allowing the candidate set for that address to collapse.
+\end{itemize}
+
+A DLP solver cannot figure out anything about a user's selfsend owned enotes (aside from performing view tag checks if their find-received key is known). The DLP solver also cannot look at a set of addresses to learn anything about addresses not in that set.
+
+\subsubsection{Generate-address secret access}
+\label{subsubsec:jamtis-forward-secrecy-generate-address-access}
+
+If the DLP solver gets access to a user's generate-address secret in addition to an address that owns spent enotes, then they can unravel the user's entire key structure (including the master key).
+\begin{itemize}
+    \item This trivially follows from knowing $k^j_x + k_{vb}$ and $k^j_u + k_m$, as detailed in the previous section.
+\end{itemize}
+
+\subsubsection{Unknown users}
+\label{subsubsec:jamtis-forward-secrecy-unknown-users}
+
+DLP solvers cannot learn anything about users whose addresses they don't know (aside from weakening their membership proofs by learning the true spends of compromised users). We support that claim with the following observations about Jamtis.
+\begin{itemize}
+    \item Onetime addresses include sender extensions and address index extensions on all generators, ensuring no private keys are directly exposed to a DLP solver by ownership/unspentness proofs.
+    \item Enote ephemeral public keys use a uniformly distributed value $r$, and the discrete log of $K_e$ with respect to a public generator is never used.
+    \item The Pedersen commitments used for amounts are perfectly hiding.
+    \item The masked addresses and amount commitments in enote images are masked with uniformly distributed values $t_k$ and $t_c$, ensuring the original enotes are perfectly hidden.
+    \item Seraphis membership proofs are required to have [todo: relevant security properties].
+\end{itemize}
+
+
+\subsection{Seraphis requirement satisfaction}
+\label{subsec:jamtis-seraphis-requirements}
+
+Jamtis fully satisfies the information recovery requirements specified by Seraphis \cite{seraphis}.
+
+\begin{itemize}
+    \item \textbf{Secret recovery}: As detailed in Section \ref{subsubsec:jamtis-balance-recovery-enote}, the values $k^o_{[g/x/u]}$, $a$, and $x$ will be recovered during balance recovery.
+
+    \item \textbf{Enote reproduction}: As detailed in Section \ref{subsubsec:jamtis-balance-recovery-enote}, recomputing $K^o$ and $C$ is required to successfully complete balance recovery on an enote.
+
+    \item \textbf{Enote privacy}: Since Jamtis enotes are constructed from ECDH secrets and the hidden private key $k_{vb}$, observers who know none of a user's Jamtis private keys cannot uncover any information about that user's enotes' contents. [todo: this requires a substantial proof]
+\end{itemize}
+
+
+
+\section{Non-prime groups}
+\label{sec:non-prime-groups}
+
+This paper requires $\mathbb{G}$ to be a prime group, however in practice it may be a prime subgroup of a non-prime group. One prominent example, used in CryptoNote \cite{cryptoNoteWhitePaper} and its progeny, is the elliptic curve Ed25519 \cite{Bernstein2012-high-speed-high-security-ed25519}, which has order $8*l$ ($l$ is a prime number $\approx 2^{252}$). CryptoNote enotes and proofs are designed to only use curve points from the subgroup of size $l$.
+
+All uses of curve points in an implementation of Seraphis based on a non-prime group must take into account the possibility that a point recorded in a transaction may not be in the prime subgroup.
+
+In particular, linking tags recorded in enote-images {\em must} be points in the prime subgroup \cite{key-image-bug}, since checking if a linking tag has appeared in the ledger usually involves a byte-wise lookup. There are several ways to ensure non-prime points are detected by transaction validators. From least to most efficient, they are:
+
+\begin{itemize}
+    \item Test $l*\tilde{K} \stackrel{?}{=} I$, where $I$ is the group's identity element.
+
+    \item Let the public key recorded in a transaction be $K_{precomputed} = (1/h)*K$, where $h$ is the curve's cofactor (8 in the case of Ed25519). When validating a transaction, compute $K = h*K_{precomputed}$ to recover the point.
+
+    \item Use an encoding abstraction such as Ristretto \cite{ristretto} that ensures all points recorded in a transaction (in enotes, enote-images, and proof elements) are in the prime subgroup.\footnote{A Ristretto point will fail to decompress into a full elliptic curve point if it is not in the prime subgroup.}
+\end{itemize}
+
+
+
+\section{Modular transaction building}
+\label{sec:modular-tx-building}
+
+Seraphis, like other transaction protocols inspired by RingCT, does not include any advanced `scripting' capabilities such as those found in Bitcoin. However, a Seraphis implementation can be designed to permit relatively more modular transaction building compared to RingCT and other protocols. A modular design enables membership proof deferment, membership proof delegation and transaction chaining.
+
+\begin{itemize}
+    \item Membership proof deferment means delaying membership proofs to the very last step of transaction construction.\footnote{Deferring membership proofs allows a transaction author to minimize timing information about when they constructed their transaction that might be leaked by membership proofs. This is especially advantageous for multisignature schemes where a transaction may take days or weeks to be constructed.}
+
+    \item Membership proof delegation means allowing a third party to construct an enote's membership proof.
+
+    \item Transaction chaining is the ability to construct a transaction B that spends an enote produced by transaction A, before A has been added to the ledger.
+\end{itemize}
+
+Below is a transaction-building procedure that supports those techniques.
+
+\begin{enumerate}
+    \item Define the transaction's output enotes and any miscellaneous memos.
+
+    \item Construct ownership/unspentness proofs for each input's enote-image. Each proof should sign a message containing all of the transaction's key images, output enotes, and memos, and the transaction fee. Cache the values $t_c$ and $t_k$ for each input.
+
+    \item Construct a balance proof for the transaction.
+
+    \begin{itemize}
+        \item The individual who performs/completes a balance proof must know the blinding factors and amounts of all input enote-images and output enotes.
+    \end{itemize}
+
+    \item Construct range proofs for all of the output enotes' amount commitments \{\ul{and for the input enote-images' masked amount commitments}\}.
+
+    \item Construct a membership proof for each input using the cached $t_c$ and $t_k$ values. Membership proofs should not sign any transaction material other than material directly related to the membership proof (e.g.\ the relevant enote-image and ledger references to the enotes referenced by the proof). Membership proofs and ownership/unspentness proofs should not share any Fiat-Shamir challenges.
+\end{enumerate}
+
+With this procedure, membership proof deferment is trivially satisfied. Delegation is achieved by only needing the values $t_{c,j}$, $t_{k,j}$, $C_j$, and $K^o_j$ to construct membership proofs. Transaction chaining is possible because the first four steps can be executed even if the inputs being spent don't exist in the ledger.
+
+
+
+\section{Other recommendations}
+\label{sec:other-recommendations}
+
+The recommendations in previous sections are not exhaustive. Here are some other ideas we think implementers should consider.
+
+\begin{itemize}
+    \item \textbf{Semantic constraints}: Transaction validation rules should contain as many `semantic constraints' as possible. A semantic constraint is one that limits variance in how a transaction may be constructed, without affecting the underlying security model. For example, how inputs and outputs are sorted, byte serialization, memo field format/usage, etc.
+
+    Reducing/eliminating semantic variance reduces the likelihood of `implementation fingerprinting'. If two transaction-builder implementations use different semantic conventions, then observers can easily identify what software was used to make a given transaction. This can have undesirable privacy implications for users.
+
+    \item \textbf{Decoy selection}: Membership proofs might have small reference sets relative to the ledger size. If `decoy' enotes are not selected effectively, then observers may be able to use heuristics to gain an advantage when trying to guess the real spend in a transaction input.
+
+    Pure random selection of decoys is weak to the `guess-newest' heuristic, where the `newest' enote referenced by a membership proof is most likely to be the real spend. Selecting from a gamma distribution instead is thought to better mimic the true spend distribution, and selecting `bins' (clumps) of enotes mitigates analysis that uses circumstantial timing knowledge about a transaction. \cite{AnalysisOfLinkability, foundations-ring-sampling}
+
+    \item \textbf{Fee granularity}: If transaction fees have very high granularity then a lot of information about a transaction author may be inferred from the fees they use (e.g.\ their wallet implementation and when they constructed a transaction) \cite{visualizing-monero-vid}. This may be mitigated by `discretizing' fee values, for example by only allowing powers of 1.5.
+\end{itemize}

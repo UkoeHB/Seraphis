@@ -1,0 +1,333 @@
+\begin{appendices}
+
+\renewcommand{\theFancyVerbLine}{%
+	\textcolor{red}{\small
+		\arabic{FancyVerbLine}}}
+
+\section{Jamtis information proofs}
+\label{appendix:jamtis-information-proofs}
+
+Jamtis is designed so users may generate proofs about various pieces of information related to their accounts.
+
+In this Appendix we will use Seraphis composition proofs \cite{seraphis} to prove knowledge of the composition of public keys that have the construction $K = a G + b X + c U$, and to prove that key images $\tilde{K}$ are derived from those $K$. Constructing a composition proof requires $a, b, c$ and a message $m$ to sign, and produces a proof $\sigma_{cp}$ and key image $\tilde{K} = (b/c)*U$. Verifying the proof requires $\sigma_{cp}, K, \tilde{K}$ and $m$. [todo: abstract away the composition proof and just use `any proof that satisfies the Seraphis ownership/unspentness requirements'?]
+
+
+\subsection{Address ownership proof}
+\label{appendix:jamtis-information-proofs-address-ownership}
+
+An address ownership proof proves that a Jamtis address $K$ is owned by the prover (or that the prover is cooperating with the owner, which is equivalent). This proof must be a $\Sigma$-protocol, which in practice means binding to a custom message $m_{custom}$ provided by the verifier. Without that binding, a proof could be reused by someone who is not the address owner.
+
+In this proof, $K$ may equal the Jamtis base spend key $K_s = k_{vb} X + k_m U$ or a full Jamtis address key $K^j_1 = k^j_g G + (k^j_x + k_{vb}) X + (k^j_u + k_m) U$.
+
+Since $K$ might have no $G$ component, we include an offset on $G$ in the proof.
+
+\textbf{Prover}
+
+\begin{enumerate}
+    \item Compute proof offset $k_{g, o} = \mathcal{H}^n_{ao}(K)$.
+    \item Create $\sigma_{cp}$ and $\tilde{K}$ from $K_o = k_{g, o} G + K$ and $m_{custom}$.
+\end{enumerate}
+
+An address ownership proof is the tuple $\Omega_{ao} = [m_{custom}, K, \tilde{K}, \sigma_{cp}]$.
+
+\textbf{Verifier}
+
+Given a proof $\Omega_{ao}$:
+\begin{enumerate}
+    \item Check that $m_{custom}$ and $K$ match the expected values.
+
+    \item Compute proof offset $k_{g, o} = \mathcal{H}^n_{ao}(K)$.
+
+    \item Verify $\sigma_{cp}$ using $K_o = k_{g, o} G + K$ and the provided $\tilde{K}, m_{custom}$.
+\end{enumerate}
+
+
+\subsection{Address index proof}
+\label{appendix:jamtis-information-proofs-address-index}
+
+An address index proof proves that a Jamtis address key $K^j_1$ was constructed from an index $j$.
+
+\textbf{Prover}
+
+Construct the proof tuple $\Omega_{ai} = [K_s, j, s^j_{gen}, K^j_1]$.
+
+\textbf{Verifier}
+
+Given a proof $\Omega_{ai}$:
+
+\begin{enumerate}
+    \item Check that $K^j_1$ matches the expected value.
+
+    \item Compute the spendkey extensions of $j$ for $G$, $X$, and $U$: $k^{j}_{[g/x/u]} = \mathcal{H}^n_{se[g/x/u]}(K_s || j || s^{j}_{gen})$
+
+    \item Compute the nominal address spend key: $K'^{j}_1 = k^{j}_g G + k^{j}_x X + k^{j}_u U + K_s$
+
+    \item Verify that $K'^j_1 \stackrel{?}{=} K^j_1$.
+\end{enumerate}
+
+\textbf{Jamtis design comment}
+
+Here we see that $s^j_{gen}$ hides $s_{ga}$ from the verifier, and the fact it is bound to $j$ prevents the verifier from using it to create other addresses. We also see that explicitly binding $k^{j}_{[g/x/u]}$ to $j$ allows address index proofs to demonstrate that $K^j_1$ has a relationship with $j$.
+
+Binding $k^{j}_{[g/x/u]}$ to $K_s$ is required so you cannot make an address index proof for an arbitrary $j'$ on any arbitrary key $K^{j"}_1$ [todo: formalize this security property]. Binding to $K_s$ also allows a user to combine address index proofs for many $j$ with a single address ownership proof on $K_s$. This could allow a generate-address Jamtis wallet to create address index proofs for arbitrary indices and combine them with an address ownership proof on $K_s$ provided by the master wallet.
+
+
+\subsection{Enote ownership proof}
+\label{appendix:jamtis-information-proofs-enote-ownership}
+
+An enote ownership proof proves that an enote with $[K^o, C]$ is owned by a key $K$. It can be combined with an address ownership proof on $K$ to demonstrate that the prover can spend the enote.
+
+An enote ownership proof may be constructed by the enote's author or its owner.
+
+\textbf{Prover}
+
+\begin{enumerate}
+    \item Compute the first sender-receiver secret using the appropriate derivation path for $K$: $s^{sr}_1$.
+\end{enumerate}
+
+The proof is $\Omega_{eo} = [K, K^o, C, s^{sr}_1]$.
+
+\textbf{Verifier}
+
+Given a proof $\Omega_{eo}$:
+
+\begin{enumerate}
+    \item Check that $K^o$ and $C$ match the expected values.
+
+    \item Compute the onetime address extensions: $k^o_{[g/x/u]} = \mathcal{H}^n_{ko[g/x/u]}(K || s^{sr}_1 || C)$
+
+    \item Compute the nominal onetime address: $K'^o = k^o_g G + k^o_x X + k^o_u U + K$
+
+    \item Check that $K'^o \stackrel{?}{=} K^o$.
+\end{enumerate}
+
+\textbf{Jamtis design comment}
+
+Here we see that binding $k^o_{[g/x/u]}$ to $K$ allows enote ownership proofs to demonstrate a relationship between $K$ and $K^o$.
+
+Note that this proof is agnostic to the derivation path for $s^{sr}_1$, meaning the verifier has no way to know the enote's type (whether it's normal or a selfsend type). He also does not know if the proof was made by the enote's author or its owner.
+
+
+\subsection{Enote amount proof}
+\label{appendix:jamtis-information-proofs-enote-amount}
+
+An enote amount proof proves that an amount commitment $C = x G + a H$ binds an amount $a$. The proof is simply $\Omega_{ea} = [C, x, a]$, which is verified by testing $x G + a H \stackrel{?}{=} C$.
+
+
+\subsection{Enote key image proof}
+\label{appendix:jamtis-information-proofs-enote-key-image}
+
+An enote key image proof proves that a key image $\tilde{K}$ is derived from a onetime address $K^o$.
+
+\textbf{Prover}
+
+\begin{enumerate}
+    \item Create a composition proof on $K^o$: $\sigma_{cp}$ with a null message $m_0$.
+\end{enumerate}
+
+The proof tuple is $\Omega_{eki} = [K^o, \tilde{K}, \sigma_{cp}]$.
+
+\textbf{Verifier}
+
+Given a proof $\Omega_{eki}$:
+
+\begin{enumerate}
+    \item Check that $K^o$ and $\tilde{K}$ match the expected values.
+
+    \item Verify that $\tilde{K}$ is a canonical group element.
+
+    \item Verify $\sigma_{cp}$ with the given $K^o$ and $\tilde{K}$ and null message $m_0$.
+\end{enumerate}
+
+
+\subsection{Enote unspent proof}
+\label{appendix:jamtis-information-proofs-enote-unspent}
+
+An enote unspent proof proves that a key image $\tilde{K}$ was {\em not} derived from a onetime address $K^o$. This can be used to show that transactions in the ledger did not spend a particular enote.\footnote{Credit for the design of this proof belongs to pseudonymous Monero contributor dangerousfreedom.}
+
+For this proof we need a matrix proof $\theta$ (see Appendix \ref{appendix:matrix-proof}).
+
+\textbf{Prover}
+
+Given a test key image $\tilde{K}'$ and a onetime address $K^o = k_g G + k_x X + k_u U$ where $k_g, k_x, k_u$ are known to the prover:
+
+\begin{enumerate}
+    \item Compute the following:
+    \begin{align*}
+        K_g &= k_g G \\
+        K_x &= k_x X \\
+        K_u &= k_u U \\
+        \tilde{K}'_x &= k_x \tilde{K}'
+    \end{align*}
+
+    \item Create a matrix proof demonstrating the discrete log $k_g$ of $K_g$ with respect to $G$: $\theta_g$.
+
+    \item Create a matrix proof demonstrating the discrete log $k_x$ of $K_x$ and $\tilde{K}'_x$ with respect to $X$ and $\tilde{K}'$: $\theta_x$.
+
+    \item Create a matrix proof demonstrating the discrete log $k_u$ of $K_u$ with respect to $U$: $\theta_u$.
+\end{enumerate}
+
+The proof tuple is $\Omega_{eu} = [K^o, \tilde{K}', \tilde{K}'_x, \theta_g, \theta_x, \theta_u]$.
+
+\textbf{Verifier}
+
+Given a proof $\Omega_{eu}$:
+
+\begin{enumerate}
+    \item Check that $K^o$ and $\tilde{K}'$ match the expected values.
+
+    \item Check that $K^o \stackrel{?}{=} K_g + K_x + K_u$.
+
+    \item Verify the matrix proofs $\theta_g, \theta_x, \theta_u$.
+
+    \item If $\tilde{K}'_x \stackrel{?}{=} K_u$ then $\tilde{K}'$ is the key image of $K^o$.\footnote{The verifier must ensure that $\tilde{K}'_x$ and $K_u$ are canonical group elements.}
+\end{enumerate}
+
+
+\subsection{Transaction funded proof}
+\label{appendix:jamtis-information-proofs-transaction-funded}
+
+A transaction funded proof proves that the prover owns the enote that has key image $\tilde{K}$. This proof must be a $\Sigma$-protocol, which in practice means binding to a custom message $m_{custom}$ provided by the verifier. Without that binding, a proof could be reused by someone who does not own the proof enote.
+
+A transaction funded proof can be used to show that the prover contributed funds to a transaction. Importantly, the enote used in the proof is not exposed to the verifier. This means the amount in the enote is also not exposed. The prover can expose that amount without exposing the original enote by making an enote amount proof on the masked commitment of the relevant transaction input (assuming they cached the blinding factor $t_c$, otherwise they would need to make an enote amount proof on the original enote's amount commitment).
+
+\textbf{Prover}
+
+Given a key image $\tilde{K}$ of a onetime address $K^o$ owned by the prover, and a message $m_{custom}$:
+
+\begin{enumerate}
+    \item Generate a random mask $t_k \in_R \mathbb{Z}_l$ and compute $K' = t_k G + K^o$.
+
+    \item Make a composition proof on $K'$: $\sigma_{cp}$.
+\end{enumerate}
+
+The proof tuple is $\Omega_{tf} = [m_{custom}, K', \tilde{K}, \sigma_{cp}]$.
+
+\textbf{Verifier}
+
+Given a proof $\Omega_{tf}$:
+
+\begin{enumerate}
+    \item Check that $m_{custom}$ and $\tilde{K}$ match the expected values.
+
+    \item Verify $\sigma_{cp}$ on the given $m_{custom}, K', \tilde{K}$.
+\end{enumerate}
+
+
+\subsection{Enote sent proof}
+\label{appendix:jamtis-information-proofs-enote-sent}
+
+An enote sent proof proves that an enote with amount $a$ and onetime address $K^o$ was sent to an address $K$.
+
+This is trivially achieved with an enote ownership proof $\Omega_{eo}$ and enote amount proof $\Omega_{ea}$. The verifier should expect that the two proofs use values of $K^o$ and $C$ that come from the same enote.
+
+
+\subsection{Reserved enote proof}
+\label{appendix:jamtis-information-proofs-reserved-enote}
+
+A reserved enote proof proves that an enote with onetime address $K^o$ is owned by an address $K$, has amount $a$, has key image $\tilde{K}$, is onchain, and is unspent.
+
+\textbf{Prover}
+
+Given an enote owned by the prover:
+
+\begin{enumerate}
+    \item Create an enote ownership proof: $\Omega_{eo}$.
+
+    \item Create an enote amount proof: $\Omega_{ea}$.
+
+    \item Create an enote key image proof: $\Omega_{eki}$.
+
+    \item Identify the enote's index in the ledger: $i$.
+\end{enumerate}
+
+The proof tuple is $\Omega_{re} = [\Omega_{eo}, \Omega_{ea}, \Omega_{eki}, i]$.
+
+\textbf{Verifier}
+
+Given a proof $\Omega_{re}$:
+
+\begin{enumerate}
+    \item Look up the enote values $[K^o, C]$ in the ledger using $i$. Expect those values match with each of the sub-proofs.
+
+    \item Check that $i$ matches the expected value (or, conversely, that the recovered values $[K^o, C]$ match their expected values).
+
+    \item Check the sub-proofs $\Omega_{eo}, \Omega_{ea}, \Omega_{eki}$.
+
+    \item Check that the key image $\tilde{K}$ in $\Omega_{eki}$ does not exist in the ledger.
+\end{enumerate}
+
+
+\subsection{Reserve proof}
+\label{appendix:jamtis-information-proofs-reserve}
+
+A reserve proof proves that the prover has at least $v = \sum a$ unspent funds in the ledger. This proof must be a $\Sigma$-protocol, which in practice means binding to a custom message $m_{custom}$ provided by the verifier. Without that binding, a proof could be reused by someone who does not own the reserved funds.
+
+\textbf{Prover}
+
+Given a set of $n$ enotes and the $m$ Jamtis addresses that own them, and a custom message $m_{custom}$:
+
+\begin{enumerate}
+    \item Randomize the order of the proof enotes.
+
+    \item Make reserved enote proofs for all of the enotes: $\{\Omega_{re}\}_n$.
+
+    \item Make address ownership proofs for all of the addresses that own enotes in the reserve proof: $\{\Omega_{ao}\}_m$. Use the custom message $m_{custom}$.
+\end{enumerate}
+
+The proof tuple is $\Omega_{rp} = [\{\Omega_{re}\}_n, \{\Omega_{ao}\}_m, m_{custom}]$.
+
+\textbf{Verifier}
+
+Given a proof $\Omega_{rp}$:
+
+\begin{enumerate}
+    \item Check that $m_{custom}$ matches the expected value.
+
+    \item Verify the address ownership proofs $\{\Omega_{ao}\}_m$ using the message $m_{custom}$.
+
+    \item Verify the reserved enote proofs $\{\Omega_{re}\}_n$ using the addresses found in $\{\Omega_{ao}\}_m$.
+
+    \item Verify that the enotes in $\{\Omega_{re}\}_n$ are in the ledger and unspent.
+    \begin{enumerate}
+        \item Use the ledger indices $i$ to obtain copies of enotes from the ledger, then check that their values match with $\{\Omega_{re}\}_n$.
+        \item Look up each reserved enote's key image $\tilde{K}$ in the ledger to check if the enotes are unspent as expected (the key images can be found in the enote key image sub-proofs).
+    \end{enumerate}
+\end{enumerate}
+
+The verifier can sum together amounts $a$ stored in the enote amount sub-proofs in $\{\Omega_{re}\}_n$ in order to get the total amount $v$ that is reserved by the prover.
+
+Note that a valid reserve proof may become invalid immediately after verification, since the enotes referenced in the proof may be spent at any time.
+
+
+
+\section{Matrix proof}
+\label{appendix:matrix-proof}
+
+We present an extended Schnorr-like proof for proving knowledge of discrete logs in a two-dimensional matrix between a vector of private keys and a vector of base keys. The powers-of-$\mu$ aggregation technique used here is inspired by \cite{triptych-preprint}.
+
+
+\subsection{Construction}
+\label{appendix:matrix-proof-construction}
+
+Our proof is a Schnorr-like $\Sigma$-protocol between prover and verifier.
+
+Suppose the prover has keys $k_i$ for $i \in 0,..., N-1$, and is given base keys $B_j$ for $j \in 0,..., M-1$. Let him compute the public key matrix $\mathbb{M}_{i,j} = k_i \textrm{ x } B_j$ for all $i, j$.
+
+\begin{enumerate}
+    \item The prover generates random scalar $\alpha \in_R \mathbb{Z}_l$.
+
+    \item The prover computes $A_j = \alpha B_j$ for all $j$. He sends all $B_j, A_j$, and $\mathbb{M}$ to the verifier.
+
+    \item The verifier generates random aggregation factor $\mu \in_R \mathbb{Z}_l$ and random challenge $c \in_R \mathbb{Z}_l$ and sends them to the prover.
+
+    \item The prover computes aggregate response $r$ and sends it to the verifier (we use exponents of $\mu$ here).\vspace{.115cm}
+    \[ r = \alpha - c * \sum^{N-1}_{i=0} \mu^i * k_i \]
+
+    \item The verifier computes
+    \[ A'_j = r B_j + c * \sum^{N-1}_{i=0} \mu^i * \mathbb{M}[i][j] \]
+
+    for all $j$ and checks $A'_j \stackrel{?}{=} A_j$.
+\end{enumerate}
+
+\end{appendices}

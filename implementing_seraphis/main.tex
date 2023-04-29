@@ -1,0 +1,219 @@
+\documentclass[usletter,11pt,english,openany]{article}
+
+%Primary packages
+\usepackage{fancyvrb}
+
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[pdftex]{graphicx}
+
+
+% Useful packages:
+
+% Advanced mathematical formulas and symbols
+% -------------------------------------
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{bm}
+
+% Footnotes
+% -------------------------------------
+\usepackage[stable,splitrule]{footmisc}
+
+% Color management package
+% -------------------------------------
+\usepackage[usenames,dvipsnames]{xcolor}
+
+% Control line spacing 
+% -------------------------------------
+% putting this between footmisc and hyperref seemed to fix broken footnote links
+\usepackage{setspace}
+\AtBeginDocument{\let~=\nobreakspace}
+\spacing{1.1}
+
+% Advanced crossreferencing commands 
+% -------------------------------------
+% Default settings:
+% \usepackage[]{hyperref}
+% Disable link coloring:
+% \usepackage[colorlinks=false]{hyperref}
+% Enable link coloring with personalized colors, make page number (not text) be link on the Table Of Contents (needs color package)
+\PassOptionsToPackage{hyphens}{url} %for url linebreaks
+\usepackage[colorlinks=true, linkcolor=BlueViolet, citecolor=BlueViolet, urlcolor=BlueViolet,linktocpage=true]{hyperref}
+
+%% more footnote stuff
+\usepackage{footnotebackref}
+
+\let\oldFootnote\footnote
+\newcommand\nextToken\relax
+
+\renewcommand\footnote[1]{%
+    \oldFootnote{#1}\futurelet\nextToken\isFootnote}
+
+\newcommand\isFootnote{%
+    \ifx\footnote\nextToken\textsuperscript{,}\fi}
+    
+% note for tables (with tabularx): if all table footnotes can't fit on the same page as the table, then they will all be shoved to the next page (seems like a bug); solution: use '\newpage' to put the table on a new page so footnotes fit (won't work if there are just too many footnotes)
+
+% Underlining with \ul (supports line wrapping)
+\usepackage{soul}
+
+
+% Flexible interface to page dimensions
+% -------------------------------------
+% Default settings:
+% \usepackage[]{geometry}
+% Set specific margins:
+\usepackage{marginnote}
+\usepackage[outer=2.62cm,inner=2.62cm,top=3cm,bottom=2.75cm, marginparwidth=2.1cm, marginparsep=.35cm]{geometry}
+
+
+%Tree drawing
+\usepackage{tikz}
+\usetikzlibrary{trees, arrows}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.15}
+
+\usepackage[edges,linguistics]{forest}
+
+
+% Tabular package extensions
+% -------------------------------------
+% \usepackage{array}
+% \usepackage{multirow}
+
+% Modify chapter level headings
+% -------------------------------------
+\usepackage[Sonny]{fncychap}
+\usepackage{fancyhdr}
+\fancyhead{}
+\fancyfoot{}
+\rhead[\small \leftmark]{\small \thepage}
+\lhead[\small \thepage]{\small \leftmark}
+\setlength{\headheight}{13.2pt}
+
+\ChRuleWidth{1pt}
+\ChNameAsIs
+\ChNameUpperCase
+\ChNameVar{\Large\bf}
+\ChNumVar{\Huge} 
+\ChTitleVar{\LARGE}
+
+% Modify appendix and add subappendices environments
+% -------------------------------------
+\usepackage{appendix}
+
+% Paragraph indentation and skip
+% -------------------------------------
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1.7ex plus 0.5ex minus 0.8ex}
+
+\usepackage{xspace}
+\newcommand\nd{\textsuperscript{nd}\xspace}
+\newcommand\rd{\textsuperscript{rd}\xspace}
+\newcommand\rds{\textsuperscript{rds}\xspace}
+\newcommand\nth{\textsuperscript{th}\xspace}
+\newcommand\nths{\textsuperscript{ths}\xspace}
+
+% List spacing
+\usepackage{enumitem}
+\setlist[itemize]{topsep=0pt}
+\newcommand{\listspace}{-.4em}
+
+% Separate document into parts
+\usepackage{titlesec}
+
+% Copyright and Restricted tags
+\usepackage{textcomp}
+%$^{\tiny{\textregistered}}$
+%$^{\tiny{\textcopyright}}$
+
+% Advanced tables
+\usepackage{ltablex}
+\usepackage{ragged2e}
+
+% add tabularx column type to prevent bad spacing when text wraps in a cell
+\newcolumntype{R}{>{\RaggedRight\arraybackslash}X}
+
+% Figure and Table reference numbering to be ChapterNum-FigNum
+% Doesn't work for trees (yet?) so trees should be called Trees/Diagrams instead of Figures
+\renewcommand\thetable{\thesection-\arabic{table}}
+\renewcommand\thefigure{\thesection-\arabic{figure}}
+
+% captions for figures
+\usepackage[labelfont=bf]{caption}
+
+% Line numbering for drafts only
+%\usepackage[pagewise,modulo,displaymath,mathlines]{lineno}
+%\linenumbers
+
+% ___________________________________________________________________________________________________________
+%
+%                  		PDF INFO
+% ___________________________________________________________________________________________________________
+
+
+
+
+\hypersetup{
+    pdftitle = {Jamtis}
+}
+
+
+\title{Implementing Seraphis (WIP)\footnote{\textbf{License}: public domain.}\\\vspace{.3cm}
+\large Draft v0.0.2\footnote{This is just a draft, so it may not always be available wherever it is currently hosted.}\vspace{-.715cm}}
+\author{koe\texttt{ ukoe@protonmail.com}}
+\date{\vspace{-.5cm}\today\vspace{-1cm}}
+
+
+\begin{document}
+% ------ Title page ------------------------
+\setlength{\abovedisplayskip}{0pt}
+\setlength{\belowdisplayskip}{0pt}
+\setlength{\abovedisplayshortskip}{0pt}
+\setlength{\belowdisplayshortskip}{0pt}
+
+%\pagenumbering{roman}
+%\pagestyle{plain}
+%\thispagestyle{empty}
+
+\pagenumbering{arabic}
+\pagestyle{fancy}
+
+\maketitle
+
+% ___________________________________________________________________________________________________________
+%
+%             			CONTENT
+% ___________________________________________________________________________________________________________
+
+%\newpage
+
+% -------- Chapters ----------------------------
+
+\input{content}
+
+% ___________________________________________________________________________________________________________
+%
+%				BACKMATTER
+% ___________________________________________________________________________________________________________
+
+% -------- Bibliography -----------------------
+
+\addcontentsline{toc}{chapter}{Bibliography}
+{\footnotesize
+\bibliographystyle{plain}
+\bibliography{references.bib}
+}
+
+% -------- Appendix ---------------------------
+\if 11
+\newpage
+\include{appendix}
+\fi
+% -------- Last page -------------------------
+
+
+
+\end{document}
