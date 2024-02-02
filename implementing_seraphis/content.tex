@@ -421,8 +421,8 @@ For all enotes that aren't auxiliary selfsend enotes, here is how we compute all
     {\tt total\_tag\_size} &= \textit{total fixed bit size of view tag} \\
     {\tt npbits} &\in [0, {\tt total\_tag\_size}] \\
     {\tt ncbits} &= {\tt total\_tag\_size} - {\tt npbits} \\
-    {\tt primary\_view\_tag\_part} || {\tt primary\_view\_tag\_residue} &= \mathcal{H}_{pvt}(D^d_{af} || K^o) \\
-    {\tt complementary\_view\_tag\_part} &= \mathcal{H}_{cvt}(s^{sr}_1 || {\tt primary\_view\_tag\_residue}) \\
+    {\tt primary\_view\_tag\_part} &= \mathcal{H}_{pvt}(D^d_{af} || K^o) \\
+    {\tt complementary\_view\_tag\_part} &= \mathcal{H}_{cvt}(s^{sr}_1) \\
 \end{align*}
 
 Putting it all together and we get:
@@ -527,9 +527,9 @@ Given an enote with associated enote ephemeral key $D^e$ and {\tt input\_context
 \begin{enumerate}
     \item Compute the nominal key derivation: $D'^d_{af} = d_{af} * D^e$
 
-    \item Compute the nominal primary view tag part and primary view tag residue:
+    \item Compute the nominal primary view tag part:
 
-    ${\tt primary\_view\_tag\_part'} || {\tt primary\_view\_tag\_residue'} = \mathcal{H}_{pvt}(D^d_{af} || K^o)$
+    ${\tt primary\_view\_tag\_part'} = \mathcal{H}_{pvt}(D^d_{af} || K^o)$
     
     \item Extract the ${\tt primary\_view\_tag\_part}$ from the ${\tt view\_tag}$
 
@@ -564,11 +564,9 @@ We the use the sender-receiver secret $s^{sr}_1$ to 1) decrypt the address tag a
 
 If you are on the auxiliary selfsend balance recovery path, then you skip the complementary view tag check. Otherwise, for normal and exclusive selfsend paths, checking the complementary view tag allows us to abort early most of the time, skipping the expensive $K^o$ recomputation.
 
-Notice that we need the ${\tt primary\_view\_tag\_residue}$ from the primary view tag check. The reason for the primary view tag residue is twofold: 1) we wanted to dissuade people from giving away their view-received key to speed up remote scanning, and 2) we wanted to not have to require knowledge of both Diffie-Helman exchanges $D^d_{af}$ and $D^d_{vr}$ to compute $s^{sr}_1$ and the complementary view tag part.
-
 \begin{enumerate}
     \item Compute the nominal complementary view tag part
-    \[{\tt complementary\_view\_tag\_part'} = \mathcal{H}_{cvt}(s^{sr}_1 || {\tt primary\_view\_tag\_residue})\]
+    \[{\tt complementary\_view\_tag\_part'} = \mathcal{H}_{cvt}(s^{sr}_1)\]
     \item Extract ${\tt complementary\_view\_tag\_part}$ from ${\tt view\_tag}$
     
     \item If ${\tt complementary\_view\_tag\_part'} \neq {\tt complementary\_view\_tag\_part}$, then ${\tt ABORT}$
@@ -645,7 +643,7 @@ Now we define the balance recovery procedure.
 \begin{enumerate}
     \item Collect a chronologically contiguous range of transactions from the ledger. We assume the results of scanning all prior transactions have been cached by the user.
 
-    \item Perform primary view tag checks on those transactions and compute nominal primary view tag residues. Collect `basic records' of enotes that pass the checks. A basic record includes the enote, its enote ephemeral public key, its input context, and its nominal address tag. Collect `auxiliary records' of enotes that did not pass the check, but reside in a transaction where an enote did.
+    \item Perform primary view tag checks on those transactions. Collect `basic records' of enotes that pass the checks. A basic record includes the enote, its enote ephemeral public key, its input context, and its nominal address tag. Collect `auxiliary records' of enotes that did not pass the check, but reside in a transaction where an enote did.
 
     Also collect the key images of transactions that contributed enotes to that basic record set.
 
