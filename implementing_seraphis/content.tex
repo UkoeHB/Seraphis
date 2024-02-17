@@ -222,7 +222,7 @@ Jamtis begins with two root private keys.\footnote{The view-balance key is not r
     \item \textbf{View-balance key}: $k_{vb} \in_R \mathbb{Z}_l$
 \end{itemize}
 
-From the view-balance key we derive the following:\footnote{The Jamtis keys $d_{af}, d_{vr}, D^j_{af}, D^j_{vr}, D^j_{base}$ may be defined on a separate elliptic curve from $\mathbb{G}$, for example with X25519 for maximized ECDH performance. For simplicity in this document we assume the primary curve $\mathbb{G}$ is used. If those keys are defined on a group with cofactor $h > 1$, then the cofactor should be included as a scalar multiplier in sender receiver secrets, for example $D^d_{af} = h * D_{af} * D^e$. If this is not done, then a malicious transaction author can determine if the recipient's relevant ECDH secret key is a multiple of $h$ (or any divisor of $h$) or not. They only need to set, for example, $D^e = D^e + D^{hf}$, where $D^{hf}$ is a point in the subgroup of order $h$ (or a factor of $h$). If the recipient successfully performs balance recovery on the enote and notifies the sender, then the sender will know that $d_{af}$ is a multiple of the subgroup order of $D^{hf}$. This is because $d_{af} * D^{hf} == I$ when $d_{af}$ is a multiple of $D^{hf}$'s subgroup's order, allowing the recipient to successfully reproduce $D^d_{af}$ only in that case. Including $h$ in sender-receiver secrets means cofactor-subgroup points will always be `canceled out' if they are present in ECDH base keys.}
+From the view-balance key we derive the following:\footnote{The Jamtis keys $d_{af}, d_{vr}, D^j_{af}, D^j_{vr}, D^j_{base}$ may be defined on a separate elliptic curve from $\mathbb{G}$, for example with X25519 for maximized ECDH performance. For simplicity in this document we assume the primary curve $\mathbb{G}$ is used. If those keys are defined on a group with cofactor $h > 1$, then the cofactor should be included as a scalar multiplier in sender receiver secrets, for example $D^d_{af} = h * D_{af} * D_e$. If this is not done, then a malicious transaction author can determine if the recipient's relevant ECDH secret key is a multiple of $h$ (or any divisor of $h$) or not. They only need to set, for example, $D_e = D_e + D^{hf}$, where $D^{hf}$ is a point in the subgroup of order $h$ (or a factor of $h$). If the recipient successfully performs balance recovery on the enote and notifies the sender, then the sender will know that $d_{af}$ is a multiple of the subgroup order of $D^{hf}$. This is because $d_{af} * D^{hf} == I$ when $d_{af}$ is a multiple of $D^{hf}$'s subgroup's order, allowing the recipient to successfully reproduce $D^d_{af}$ only in that case. Including $h$ in sender-receiver secrets means cofactor-subgroup points will always be `canceled out' if they are present in ECDH base keys.}
 \begin{itemize}
     \item \textbf{View-received key}: $d_{vr} = \mathcal{H}^n_{vr}(k_{vb})$
     \item \textbf{Assist-filter key}: $d_{af} = \mathcal{H}^n_{af}(d_{vr})$
@@ -282,41 +282,41 @@ The answer first pioneered by CryptoNote \cite{cryptoNoteWhitePaper} for privacy
 \subsubsection{Diffie-Hellman derived keys $D^d_{af}$ and $D^d_{vr}$}
 \label{subsubsec:jamtis-srsecret-DH-derived-key}
 
-At the core of Jamtis enote construction is an enote ephemeral private key $r \in_R \mathbb{Z}_l$ and associated enote ephemeral public key $D^e$. The value $D^e$ is recorded alongside a Jamtis enote for use by the enote's owner.
+At the core of Jamtis enote construction is an enote ephemeral private key $r \in_R \mathbb{Z}_l$ and associated enote ephemeral public key $D_e$. The value $D_e$ is recorded alongside a Jamtis enote for use by the enote's owner.
 
-As we will see, an enote owner can always use their assist-filter key $d_{af}$ with $D^e$ to recover the Diffie-Hellman derived key $D^d_{af}$:
-\[ D^d_{af} = d_{af} D^e \]
+As we will see, an enote owner can always use their assist-filter key $d_{af}$ with $D_e$ to recover the Diffie-Hellman derived key $D^d_{af}$:
+\[ D^d_{af} = d_{af} D_e \]
 
-Likewise, an enote owner can always use their view-received key $d_{vr}$ with $D^e$ to recover the Diffie-Hellman derived key $D^d_{vr}$:
-\[ D^d_{vr} = d_{vr} D^e \]
+Likewise, an enote owner can always use their view-received key $d_{vr}$ with $D_e$ to recover the Diffie-Hellman derived key $D^d_{vr}$:
+\[ D^d_{vr} = d_{vr} D_e \]
 
-There are two possible ways to compute $D^e$, $D^d_{af}$, and $D^d_{vr}$ during transaction construction.
+There are two possible ways to compute $D_e$, $D^d_{af}$, and $D^d_{vr}$ during transaction construction.
 
 \textbf{Standard}
 
-For most enotes, $D^e$, $D^d_{af}$, and $D^d_{vr}$ will be computed directly from the recipient's address keys.\vspace{.115cm}
+For most enotes, $D_e$, $D^d_{af}$, and $D^d_{vr}$ will be computed directly from the recipient's address keys.\vspace{.115cm}
 \begin{align*}
-    D^e      &= r D^j_{base} \\
+    D_e      &= r D^j_{base} \\
     D^d_{af} &= r D^j_{af} \\
     D^d_{vr} &= r D^j_{vr} \\
 \end{align*}
 
-In this case, $D^d_{af} = r D^j_{af} = r d_{af} D^j_{base} = d_{af} D^e$. Likewise, $D^d_{vr} = r D^j_{vr} = r d_{vr} D^j_{base} = d_{vr} D^e$.
+In this case, $D^d_{af} = r D^j_{af} = r d_{af} D^j_{base} = d_{af} D_e$. Likewise, $D^d_{vr} = r D^j_{vr} = r d_{vr} D^j_{base} = d_{vr} D_e$.
 
-\textbf{Shared-$D^e$ optimization}
+\textbf{Shared-$D_e$ optimization}
 
-If a transaction contains one recipient and one additional enote sending funds to the transaction author (e.g.\ a leftover/change amount from the difference between inputs, the one recipient, and the transaction fee), then that additional `selfsend' enote can share the other enote's $D^e$.
+If a transaction contains one recipient and one additional enote sending funds to the transaction author (e.g.\ a leftover/change amount from the difference between inputs, the one recipient, and the transaction fee), then that additional `selfsend' enote can share the other enote's $D_e$.
 
 In this case, the transaction author knows his own $d_{af}$ and $d_{vr}$ keys, so he can define the following:\vspace{.115cm}
 \begin{align*}
-    D^e_{\textrm{self}} &= D^e_{\textrm{other}} \\
-    D^d_{af}            &= d_{af} * K^e_{\textrm{self}} \\
-    D^d_{vr}            &= d_{vr} * K^e_{\textrm{self}}
+    D^{\textrm{self}_e} &= D^{\textrm{other}_e} \\
+    D^d_{af}            &= d_{af} * D^{\textrm{self}_e} \\
+    D^d_{vr}            &= d_{vr} * D^{\textrm{self}_e}
 \end{align*}
 
 which ensures he can properly recompute $D^d_{af}$ and $D^d_{vr}$ during balance recovery.
 
-A transaction that uses the shared-$D^e$ optimization only needs to store one copy of $D^e$.\footnote{A major advantage of sharing $D^e$ is you only need to derive $D^d_{af}$ and $D^d_{vr}$ once instead of twice. If most transactions in the ledger have two outputs, and all two-output transactions use the shared-$D^e$ optimization, then there will be a substantial reduction in $D^d_{af}$ and $D^d_{vr}$ computations relative to a scenario with no $D^e$ sharing.}
+A transaction that uses the shared-$D_e$ optimization only needs to store one copy of $D_e$.\footnote{A major advantage of sharing $D_e$ is you only need to derive $D^d_{af}$ and $D^d_{vr}$ once instead of twice. If most transactions in the ledger have two outputs, and all two-output transactions use the shared-$D_e$ optimization, then there will be a substantial reduction in $D^d_{af}$ and $D^d_{vr}$ computations relative to a scenario with no $D_e$ sharing.}
 
 \subsubsection{Secret uniqueness: {\tt input\_context}}
 \label{subsubsec:jamtis-srsecret-secret-uniqueness}
@@ -328,7 +328,7 @@ To ensure uniqueness of enote components between transactions, we will bind the 
     \item \textbf{Normal txs}: ${\tt input\_context} = \mathcal{H}_{icn}(\tilde{K}_1 || ... || \tilde{K}_m)$
 \end{itemize}
 
-To further ensure uniqueness {\em within} a transaction, transaction verifiers must mandate that all values $D^e$ in a transaction are unique (with a further caveat for selfsend enotes mentioned in Section \ref{subsubsec:jamtis-srsecret-derivation-selfsend}).\footnote{It is safe for multiple $D^e$ in a transaction to be cofactor-variants of the same point, since we bind $s^{sr}_1$ to the byte-wise representation of $D^e$.}
+To further ensure uniqueness {\em within} a transaction, transaction verifiers must mandate that all values $D_e$ in a transaction are unique (with a further caveat for selfsend enotes mentioned in Section \ref{subsubsec:jamtis-srsecret-derivation-selfsend}).\footnote{It is safe for multiple $D_e$ in a transaction to be cofactor-variants of the same point, since we bind $s^{sr}_1$ to the byte-wise representation of $D_e$.}
 
 \subsubsection{Secrets $s^{sr}_1, s^{sr}_2$ (derivation path 1): normal enotes}
 \label{subsubsec:jamtis-srsecret-derivation-normal}
@@ -337,14 +337,14 @@ For normal enotes that transfer funds to another person, the two sender-receiver
 
 \textbf{Sender}
 \begin{align*}
-    s^{sr}_1 &= \mathcal{H}_{sr1n}(D^d_{vr} || D^e || \texttt{input\_context}) \\
+    s^{sr}_1 &= \mathcal{H}_{sr1n}(D^d_{vr} || D_e || \texttt{input\_context}) \\
     s^{sr}_2 &= \mathcal{H}_{sr2n}(r * G)
 \end{align*}
 
 \textbf{Recipient}
 \begin{align*}
-    s^{sr}_1 &= \mathcal{H}_{sr1n}(D^d_{vr} || D^e || \texttt{input\_context}) \\
-    s^{sr}_2 &= \mathcal{H}_{sr2n}(1/(d^j_a * d_{vr}) * D^e)
+    s^{sr}_1 &= \mathcal{H}_{sr1n}(D^d_{vr} || D_e || \texttt{input\_context}) \\
+    s^{sr}_2 &= \mathcal{H}_{sr2n}(1/(d^j_a * d_{vr}) * D_e)
 \end{align*}
 
 The second secret $s^{sr}_2$ is computed from an `inverse' Diffie-Hellman exchange involving the recipient's address key $D^j_{base} = d^j_a * D_{base}$. The usefulness of $s^{sr}_2$ will be explored in Sections \ref{subsubsec:jamtis-cryptonote-flaws-janus} and \ref{subsec:jamtis-wallets}.
@@ -352,19 +352,19 @@ The second secret $s^{sr}_2$ is computed from an `inverse' Diffie-Hellman exchan
 \subsubsection{Secrets $s^{sr}_1, s^{sr}_2$ (derivation path 2): selfsend enotes}
 \label{subsubsec:jamtis-srsecret-derivation-selfsend}
 
-When sending funds to himself, a transaction author derives the two sender-receiver secrets $s^{sr}_1, s^{sr}_2$ from $D^e$ and his Jamtis key $k_{vb}$. The secrets can be recomputed in the same way during balance recovery.
+When sending funds to himself, a transaction author derives the two sender-receiver secrets $s^{sr}_1, s^{sr}_2$ from $D_e$ and his Jamtis key $k_{vb}$. The secrets can be recomputed in the same way during balance recovery.
 
 As we will see in Section \ref{subsubsec:jamtis-wallets-remote-assisted}, providing a separate derivation path for selfsend enotes improves the privacy attributes of balance recovery when $d_{af}$ is given to a semi-trusted third party.
 
 It is possible to define multiple different selfsend enote types (e.g. change-like enotes, churn-like enotes) using different derivations for $s^{sr}_1$ and $s^{sr}_2$. There are two classes of enote types: `exclusive' and `auxiliary'. There should be exactly one exclusive selfsend enote per transaction, and any number of auxiliary selfsend enotes per transaction. The reason for this is discussed further in Section \ref{subsubsec:jamtis-enote-construction-view-tag}. For convenience, we domain-separate $s^{sr}_2$ based on the different selfsend enote types $\tau$, and $s^{sr}_1$ on a boolean value $\tt{is\_aux}$.
 \begin{align*}
-    s^{sr}_1 &= \mathcal{H}_{sr1s[\tt{is\_aux}]}(k_{vb} || D^e || {\tt input\_context}) \\
+    s^{sr}_1 &= \mathcal{H}_{sr1s[\tt{is\_aux}]}(k_{vb} || D_e || {\tt input\_context}) \\
     s^{sr}_2 &= \mathcal{H}_{sr2s[\tau]}(k_{vb} || s^{sr}_1)
 \end{align*}
 
-In this case $s^{sr}_2$ does not rely on the inverse Diffie-Hellman secret $r G$, which simplifies the shared-$D^e$ optimization because there is no need for the value $(1/(d^j_a * d_{vr}) * D^e_{\textrm{other}}$ when building the shared-$D^e$ selfsend enote.
+In this case $s^{sr}_2$ does not rely on the inverse Diffie-Hellman secret $r G$, which simplifies the shared-$D_e$ optimization because there is no need for the value $(1/(d^j_a * d_{vr}) * D^{\textrm{other}_e}$ when building the shared-$D_e$ selfsend enote.
 
-\textbf{Uniqueness}: To ensure uniqueness of $s^{sr}_1$ and $s^{sr}_2$ when $D^e$ is shared between two enotes, transaction authors must avoid sharing $D^e$ between two selfsend enotes of the same type class (i.e. if there are two selfsend enotes in one transaction, then one must be exclusive and the other must be auxiliary). The secrets will be unique in this case, the case of one plain and one selfsend since the $s^{sr}_1$ derivation is different, and more than 2 selfsends since $D^e$ won't be shared.
+\textbf{Uniqueness}: To ensure uniqueness of $s^{sr}_1$ and $s^{sr}_2$ when $D_e$ is shared between two enotes, transaction authors must avoid sharing $D_e$ between two selfsend enotes of the same type class (i.e. if there are two selfsend enotes in one transaction, then one must be exclusive and the other must be auxiliary). The secrets will be unique in this case, the case of one plain and one selfsend since the $s^{sr}_1$ derivation is different, and more than 2 selfsends since $D_e$ won't be shared.
 
 \textbf{Optimized design}: Selfsend enote secrets can be computed with three hash operations (including the input context), whereas normal enote secrets require three hash operations, and three ECDH exchanges.
 
@@ -407,7 +407,7 @@ Onetime addresses are bound to an {\tt input\_context} via $s^{sr}_1$ so that th
 To facilitate balance recovery, an encrypted version of the Jamtis address tag is recorded in each enote.
 \[ {\tt addr\_tag\_enc} = \textrm{\tt addr\_tag XOR } \mathcal{H}_{ate}(s^{sr}_1 || K^o) \]
 
-We bind to $K^o$ for robustness.\footnote{It is feasible, although unlikely, that $s^{sr}_1$ could be re-used between separate transaction attempts using different recipients. For example, a shared-$D^e$ selfsend could use two different selfsend addresses but the same original recipient and same enote ephemeral private key $r$. In that case, binding to $K^o$ ensures different address tags won't be encrypted using the same secret.}
+We bind to $K^o$ for robustness.\footnote{It is feasible, although unlikely, that $s^{sr}_1$ could be re-used between separate transaction attempts using different recipients. For example, a shared-$D_e$ selfsend could use two different selfsend addresses but the same original recipient and same enote ephemeral private key $r$. In that case, binding to $K^o$ ensures different address tags won't be encrypted using the same secret.}
 
 \subsubsection{Flexible view tag}
 \label{subsubsec:jamtis-enote-construction-view-tag}
@@ -454,7 +454,7 @@ For this reason, we introduce the distinction between exclusive and auxiliary se
 A Jamtis enote sending funds to an address $[K^j_s, D^j_{af}, D^j_{vr}, D^j_{base}, \textrm{\tt addr\_tag}^j]$ is therefore the tuple\footnote{A Jamtis coinbase enote will record $a$ explicitly instead of $C$ and $a_{enc}$.}\vspace{.115cm}
 \[ [K^o, C, a_{enc}, {\tt addr\_tag\_enc}, {\tt view\_tag}] \]
 
-The enote is associated with an ephemeral public key $D^e$ and an {\tt input\_context}.
+The enote is associated with an ephemeral public key $D_e$ and an {\tt input\_context}.
 
 
 \subsection{CryptoNote address scheme flaws}
@@ -491,18 +491,18 @@ Since that two-part process is separated, it is possible for each part to be con
 
 Jamtis solves this by binding enote contents to the index $j$ of the recipient address (see Section \ref{subsec:jamtis-balance-recovery} for the entire balance recovery process).
 \begin{enumerate}
-    \item The enote ephemeral key $D^e$ depends on $d^j_a$: $D^e = r D^j_{base} = r*(1 / d^j_a)*G$
+    \item The enote ephemeral key $D_e$ depends on $d^j_a$: $D_e = r D^j_{base} = r*(1 / d^j_a)*G$
 
-    \item The recipient recovers index $j$ by decrypting ${\tt addr\_tag\_enc}$ with $D^d_{vr} = d_{vr} D^e$ (and then deciphering the decrypted address tag).
+    \item The recipient recovers index $j$ by decrypting ${\tt addr\_tag\_enc}$ with $D^d_{vr} = d_{vr} D_e$ (and then deciphering the decrypted address tag).
 
     \item The recipient recomputes onetime address $K^o$ using $K_s$, $j$, and $D^d_{vr}$.
 
-    \item The recipient computes the second secret $s^{sr}_2$ from the values $d^j_a * D^e$ and $D^d_{af}$.
+    \item The recipient computes the second secret $s^{sr}_2$ from the values $d^j_a * D_e$ and $D^d_{af}$.
 \end{enumerate}
 
-The key here is in the last point. Specifically, $s^{sr}_2$ depends on both $D^d_{vr}$ and the recovered $j$. If the recovered $j$ does not match the $j'$ of the key $K^{j'}_{base}$ used to construct $D^e = r K^{j'}_{base}$, then the user will compute a different $s^{sr}_2$ from the transaction author.
+The key here is in the last point. Specifically, $s^{sr}_2$ depends on both $D^d_{vr}$ and the recovered $j$. If the recovered $j$ does not match the $j'$ of the key $K^{j'}_{base}$ used to construct $D_e = r K^{j'}_{base}$, then the user will compute a different $s^{sr}_2$ from the transaction author.
 
-In detail, the user will compute $s^{sr}_2$ with the ECDH key $1/(d^j_a * d_{vr}) * D^e = r * (d^{j'}_a/d^{j}_a) * G$, which the transaction author cannot know since one of $d^{j}_a$ and $d^{j'}_a$ are secrets. Additionally, if an attacker does know one address private key, they still cannot compute inverse Diffie-Helman exchange the way the recipient would ($1/(d^j_a * d_{vr}) * D^e$) since they would also need to know $d_{vr}$. Therefore if a user recovers $s^{sr}_2$ successfully (which can be verified by reproducing $C$ correctly), and assuming $K^o$ was recomputed properly, then the transaction author must have used address components derived from the same index $j$.
+In detail, the user will compute $s^{sr}_2$ with the ECDH key $1/(d^j_a * d_{vr}) * D_e = r * (d^{j'}_a/d^{j}_a) * G$, which the transaction author cannot know since one of $d^{j}_a$ and $d^{j'}_a$ are secrets. Additionally, if an attacker does know one address private key, they still cannot compute inverse Diffie-Helman exchange the way the recipient would ($1/(d^j_a * d_{vr}) * D_e$) since they would also need to know $d_{vr}$. Therefore if a user recovers $s^{sr}_2$ successfully (which can be verified by reproducing $C$ correctly), and assuming $K^o$ was recomputed properly, then the transaction author must have used address components derived from the same index $j$.
 
 The Janus attack is not an issue for Jamtis selfsend enotes since they are constructed with the view-balance key. A person with the view-balance key already has the power to generate all Jamtis addresses and decipher the address tags of existing addresses.
 
@@ -522,10 +522,10 @@ Jamtis balance recovery can be divided into two steps: view tag checks and enote
 \subsubsection{Primary view tag check and $D^d_{af}$}
 \label{subsubsec:jamtis-balance-recovery-view-tag-primary}
 
-Given an enote with associated enote ephemeral key $D^e$ and {\tt input\_context}, a user who wants to see if they own the enote begins by checking its primary view tag part. This requires the user's $d_{af}$.
+Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context}, a user who wants to see if they own the enote begins by checking its primary view tag part. This requires the user's $d_{af}$.
 
 \begin{enumerate}
-    \item Compute the nominal key derivation: $D'^d_{af} = d_{af} * D^e$
+    \item Compute the nominal key derivation: $D'^d_{af} = d_{af} * D_e$
 
     \item Compute the nominal primary view tag part:
 
@@ -553,10 +553,10 @@ We the use the sender-receiver secret $s^{sr}_1$ to 1) decrypt the address tag a
 \begin{itemize}
         \item \textbf{Normal scan}:
         \begin{enumerate}
-            \item $D'^d_{vr} = d_{vr} * D^e$
-            \item $s'^{sr}_1 = \mathcal{H}_{sr1n}(D'^d_{vr} || D^e || \texttt{input\_context})$
+            \item $D'^d_{vr} = d_{vr} * D_e$
+            \item $s'^{sr}_1 = \mathcal{H}_{sr1n}(D'^d_{vr} || D_e || \texttt{input\_context})$
         \end{enumerate}
-        \item \textbf{Selfsend scan}: $s'^{sr}_1 = \mathcal{H}_{sr1s[{\tt is\_aux}]}(k_{vb} || D^e || {\tt input\_context})$
+        \item \textbf{Selfsend scan}: $s'^{sr}_1 = \mathcal{H}_{sr1s[{\tt is\_aux}]}(k_{vb} || D_e || {\tt input\_context})$
 \end{itemize}
 
 \subsubsection{Complementary view tag check}
@@ -712,7 +712,7 @@ A DLP solver with a user's public Jamtis address can recover the user's find-rec
 \begin{itemize}
     \item The adversary can solve for $d_{vr}$ in $d_{vr} K^j_{base} = K^j_{vr}$ and use it to unwrap candidate onetime addresses to check if the unwrapped spend keys match the address's $K^j_s$.
 
-    \item The adversary can solve for $r$ in $r K^j_{base} = D^e$ to compute the key $r G$, which allows the $s^{sr}_2$ of normal enotes to be computed.
+    \item The adversary can solve for $r$ in $r K^j_{base} = D_e$ to compute the key $r G$, which allows the $s^{sr}_2$ of normal enotes to be computed.
 \end{itemize}
 
 If at least one of those normal enotes is spent, then the DLP solver can additionally compute all of the user's key images. More precisely, they can generate key image candidates derived from all on-chain key images, among which will be the real key images - if two normal enotes are spent then the candidate set collapses.
@@ -740,7 +740,7 @@ If the DLP solver gets access to a user's generate-address secret in addition to
 DLP solvers cannot learn anything about users whose addresses they don't know (aside from weakening their membership proofs by learning the true spends of compromised users). We support that claim with the following observations about Jamtis.
 \begin{itemize}
     \item Onetime addresses include sender extensions and address index extensions on all generators, ensuring no private keys are directly exposed to a DLP solver by ownership/unspentness proofs.
-    \item Enote ephemeral public keys use a uniformly distributed value $r$, and the discrete log of $D^e$ with respect to a public generator is never used.
+    \item Enote ephemeral public keys use a uniformly distributed value $r$, and the discrete log of $D_e$ with respect to a public generator is never used.
     \item The Pedersen commitments used for amounts are perfectly hiding.
     \item The masked addresses and amount commitments in enote images are masked with uniformly distributed values $t_k$ and $t_c$, ensuring the original enotes are perfectly hidden.
     \item Seraphis membership proofs are required to have [todo: relevant security properties].
