@@ -347,7 +347,7 @@ For normal enotes that transfer funds to another person, the two sender-receiver
     s^{sr}_2 &= \mathcal{H}_{sr2n}(1/(d^j_a * d_{vr}) * D_e)
 \end{align*}
 
-The second secret $s^{sr}_2$ is computed from an `inverse' Diffie-Hellman exchange involving the recipient's address key $D^j_{base} = d^j_a * D_{base}$. The usefulness of $s^{sr}_2$ will be explored in Sections \ref{subsubsec:jamtis-cryptonote-flaws-janus} and \ref{subsec:jamtis-wallets}.
+The second secret $s^{sr}_2$ is computed from an `inverse' Diffie-Hellman exchange involving the recipient's address key $D^j_{base} = (d^j_a * d_{vr}) * G$. The usefulness of $s^{sr}_2$ will be explored in Sections \ref{subsubsec:jamtis-cryptonote-flaws-janus} and \ref{subsec:jamtis-wallets}.
 
 \subsubsection{Secrets $s^{sr}_1, s^{sr}_2$ (derivation path 2): selfsend enotes}
 \label{subsubsec:jamtis-srsecret-derivation-selfsend}
