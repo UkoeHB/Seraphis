@@ -284,11 +284,11 @@ The answer first pioneered by CryptoNote \cite{cryptoNoteWhitePaper} for privacy
 
 At the core of Jamtis enote construction is an enote ephemeral private key $r \in_R \mathbb{Z}_l$ and associated enote ephemeral public key $D_e$. The value $D_e$ is recorded alongside a Jamtis enote for use by the enote's owner.
 
-As we will see, an enote owner can always use their filter-assist key $d_{fa}$ with $D_e$ to recover the Diffie-Hellman derived key $D^d_{fa}$:
-\[ D^d_{fa} = d_{fa} D_e \]
-
-Likewise, an enote owner can always use their view-received key $d_{vr}$ with $D_e$ to recover the Diffie-Hellman derived key $D^d_{vr}$:
-\[ D^d_{vr} = d_{vr} D_e \]
+As we will see, an enote owner can always use their filter-assist key $d_{fa}$ and view-received key $d_{vr}$ with $D_e$ to recover the Diffie-Hellman derived keys $D^d_{fa}$ and $D^d_{vr}$:\vspace{.115cm}
+\begin{align*}
+    D^d_{fa} &= d_{fa} D_e \\
+    D^d_{vr} &= d_{vr} D_e
+\end{align*}
 
 There are two possible ways to compute $D_e$, $D^d_{fa}$, and $D^d_{vr}$ during transaction construction.
 
