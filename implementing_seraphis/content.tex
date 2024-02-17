@@ -491,13 +491,13 @@ Since that two-part process is separated, it is possible for each part to be con
 
 Jamtis solves this by binding enote contents to the index $j$ of the recipient address (see Section \ref{subsec:jamtis-balance-recovery} for the entire balance recovery process).
 \begin{enumerate}
-    \item The enote ephemeral key $D_e$ depends on $d^j_a$: $D_e = r D^j_{base} = r*(1 / d^j_a)*G$
+    \item The enote ephemeral key $D_e$ depends on $d^j_a$ and $d_{vr}$: $D_e = r D^j_{base} = r * d^j_a * d_{vr} * G$
 
     \item The recipient recovers index $j$ by decrypting ${\tt addr\_tag\_enc}$ with $D^d_{vr} = d_{vr} D_e$ (and then deciphering the decrypted address tag).
 
     \item The recipient recomputes onetime address $K^o$ using $K_s$, $j$, and $D^d_{vr}$.
 
-    \item The recipient computes the second secret $s^{sr}_2$ from the values $d^j_a * D_e$ and $D^d_{fa}$.
+    \item The recipient computes the second secret $s^{sr}_2$ from the values $1/(d^j_a * d_{vr}) * D_e$.
 \end{enumerate}
 
 The key here is in the last point. Specifically, $s^{sr}_2$ depends on both $D^d_{vr}$ and the recovered $j$. If the recovered $j$ does not match the $j'$ of the key $K^{j'}_{base}$ used to construct $D_e = r K^{j'}_{base}$, then the user will compute a different $s^{sr}_2$ from the transaction author.
