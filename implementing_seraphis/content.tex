@@ -309,9 +309,9 @@ If a transaction contains one recipient and one additional enote sending funds t
 
 In this case, the transaction author knows his own $d_{fa}$ and $d_{vr}$ keys, so he can define the following:\vspace{.115cm}
 \begin{align*}
-    D^{\textrm{self}_e} &= D^{\textrm{other}_e} \\
-    D^d_{fa}            &= d_{fa} * D^{\textrm{self}_e} \\
-    D^d_{vr}            &= d_{vr} * D^{\textrm{self}_e}
+    D^{\textrm{self}}_e &= D^{\textrm{other}}_e \\
+    D^d_{fa}            &= d_{fa} * D^{\textrm{self}}_e \\
+    D^d_{vr}            &= d_{vr} * D^{\textrm{self}}_e
 \end{align*}
 
 which ensures he can properly recompute $D^d_{fa}$ and $D^d_{vr}$ during balance recovery.
@@ -362,7 +362,7 @@ It is possible to define multiple different selfsend enote types (e.g. change-li
     s^{sr}_2 &= \mathcal{H}_{sr2s[\tau]}(k_{vb} || s^{sr}_1)
 \end{align*}
 
-In this case $s^{sr}_2$ does not rely on the inverse Diffie-Hellman secret $r G$, which simplifies the shared-$D_e$ optimization because there is no need for the value $(1/(d^j_a * d_{vr}) * D^{\textrm{other}_e}$ when building the shared-$D_e$ selfsend enote.
+In this case $s^{sr}_2$ does not rely on the inverse Diffie-Hellman secret $r G$, which simplifies the shared-$D_e$ optimization because there is no need for the value $(1/(d^j_a * d_{vr}) * D^{\textrm{other}}_e$ when building the shared-$D_e$ selfsend enote.
 
 \textbf{Uniqueness}: To ensure uniqueness of $s^{sr}_1$ and $s^{sr}_2$ when $D_e$ is shared between two enotes, transaction authors must avoid sharing $D_e$ between two selfsend enotes of the same type class (i.e. if there are two selfsend enotes in one transaction, then one must be exclusive and the other must be auxiliary). The secrets will be unique in this case, the case of one plain and one selfsend since the $s^{sr}_1$ derivation is different, and more than 2 selfsends since $D_e$ won't be shared.
 
