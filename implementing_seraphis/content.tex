@@ -356,15 +356,15 @@ When sending funds to himself, a transaction author derives the two sender-recei
 
 As we will see in Section \ref{subsubsec:jamtis-wallets-remote-assisted}, providing a separate derivation path for selfsend enotes improves the privacy attributes of balance recovery when $d_{fa}$ is given to a semi-trusted third party.
 
-It is possible to define multiple different selfsend enote types (e.g.\ change-like enotes, churn-like enotes) using different derivations for $s^{sr}_1$ and $s^{sr}_2$. There are two classes of enote types: `exclusive' and `auxiliary'. There should be exactly one exclusive selfsend enote per transaction, and any number of auxiliary selfsend enotes per transaction. The reason for this is discussed further in Section \ref{subsubsec:jamtis-enote-construction-view-tag}. For convenience, we domain-separate $s^{sr}_2$ based on the different selfsend enote types $\tau$, and $s^{sr}_1$ on a boolean value $\tt{is\_aux}$.
+It is possible to define multiple different selfsend enote types (e.g.\ change enotes, churn enotes) using different derivations for $s^{sr}_1$ and $s^{sr}_2$. There are two classes of selfsend enotes: `exclusive' and `auxiliary'. There should be exactly one exclusive selfsend enote per transaction, and there may be any number of additional auxiliary selfsend enotes. The reason for this is discussed further in Section \ref{subsubsec:jamtis-enote-construction-view-tag}. For convenience, we domain-separate $s^{sr}_2$ based on the different selfsend enote types $\tau$, and $s^{sr}_1$ on a boolean value $\tt{is\_aux}$.
 \begin{align*}
     s^{sr}_1 &= \mathcal{H}_{sr1s[\tt{is\_aux}]}(k_{vb} || D_e || {\tt input\_context}) \\
     s^{sr}_2 &= \mathcal{H}_{sr2s[\tau]}(k_{vb} || s^{sr}_1)
 \end{align*}
 
-In this case $s^{sr}_2$ does not rely on the inverse Diffie-Hellman secret $r G$, which simplifies the shared-$D_e$ optimization because there is no need for the value $(1/(d^j_a * d_{vr}) * D^{\textrm{other}}_e$ when building the shared-$D_e$ selfsend enote.
+In this case $s^{sr}_2$ does not rely on the inverse Diffie-Hellman secret $r G$, which simplifies the shared-$D_e$ optimization because there is no need for the value $(1/(d^j_a * d_{vr})) * D^{\textrm{other}}_e$ when building the shared-$D_e$ selfsend enote.
 
-\textbf{Uniqueness}: To ensure uniqueness of $s^{sr}_1$ and $s^{sr}_2$ when $D_e$ is shared between two enotes, transaction authors must avoid sharing $D_e$ between two selfsend enotes of the same type class (i.e. if there are two selfsend enotes in one transaction, then one must be exclusive and the other must be auxiliary). The secrets will be unique in this case, the case of one plain and one selfsend since the $s^{sr}_1$ derivation is different, and more than 2 selfsends since $D_e$ won't be shared.
+\textbf{Uniqueness}: To ensure uniqueness of $s^{sr}_1$ and $s^{sr}_2$ when $D_e$ is shared between two enotes, transaction authors must avoid sharing $D_e$ between two selfsend enotes of the same class (i.e. if there are two selfsend enotes in one transaction, then one must be exclusive and the other must be auxiliary). The secrets will be unique in the case of $D_e$ shared between a plain and a selfsend enote since the $s^{sr}_1$ derivation will be different for each.
 
 \textbf{Optimized design}: Selfsend enote secrets can be computed with three hash operations (including the input context), whereas normal enote secrets require three hash operations, and three ECDH exchanges.
 
