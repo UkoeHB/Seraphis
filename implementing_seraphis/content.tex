@@ -95,7 +95,7 @@ An enote-image will look like this:
 \section{Balance proofs}
 \label{sec:balance-proofs}
 
-For amount balance proofs, we use a non-zero `blinding factor remainder' $p_r$, and publish it inside transactions.\footnote{An alternative to adding $p_r$ to transactions explicitly would be creating a signature on the public key $p_r G$ (as done in Lelantus-Spark \cite{lelantus-spark}). This can prevent problem 2 from Section \ref{subsec:confidential-transactions-sender-receiver-anonymity}. However, if proof structures resilient to problem 2 are used, we do not think signing $p_r G$ offers any advantages (problem 1 is unrelated to $p_r$).} Using $p_r > 0$ avoids requiring interdependency between enote images. Any range proof construction may be used that satisfies [todo: xyz requirements] (e.g. Bulletproofs+ \cite{bulletproofs_plus}).
+For amount balance proofs, we use a non-zero `blinding factor remainder' $p_r$, and publish it inside transactions.\footnote{An alternative to adding $p_r$ to transactions explicitly would be creating a signature on the public key $p_r G$ (as done in Lelantus-Spark \cite{lelantus-spark}). This can prevent problem 2 from Section \ref{subsec:confidential-transactions-sender-receiver-anonymity}. However, if proof structures resilient to problem 2 are used, we do not think signing $p_r G$ offers any advantages (problem 1 is unrelated to $p_r$).} Using $p_r > 0$ avoids requiring interdependency between enote images. Any range proof construction may be used that satisfies [todo: xyz requirements] (e.g.\ Bulletproofs+ \cite{bulletproofs_plus}).
 
 \subsection{Constructing a balance proof}
 \label{subsec:balance-proofs-construction}
@@ -356,7 +356,7 @@ When sending funds to himself, a transaction author derives the two sender-recei
 
 As we will see in Section \ref{subsubsec:jamtis-wallets-remote-assisted}, providing a separate derivation path for selfsend enotes improves the privacy attributes of balance recovery when $d_{fa}$ is given to a semi-trusted third party.
 
-It is possible to define multiple different selfsend enote types (e.g. change-like enotes, churn-like enotes) using different derivations for $s^{sr}_1$ and $s^{sr}_2$. There are two classes of enote types: `exclusive' and `auxiliary'. There should be exactly one exclusive selfsend enote per transaction, and any number of auxiliary selfsend enotes per transaction. The reason for this is discussed further in Section \ref{subsubsec:jamtis-enote-construction-view-tag}. For convenience, we domain-separate $s^{sr}_2$ based on the different selfsend enote types $\tau$, and $s^{sr}_1$ on a boolean value $\tt{is\_aux}$.
+It is possible to define multiple different selfsend enote types (e.g.\ change-like enotes, churn-like enotes) using different derivations for $s^{sr}_1$ and $s^{sr}_2$. There are two classes of enote types: `exclusive' and `auxiliary'. There should be exactly one exclusive selfsend enote per transaction, and any number of auxiliary selfsend enotes per transaction. The reason for this is discussed further in Section \ref{subsubsec:jamtis-enote-construction-view-tag}. For convenience, we domain-separate $s^{sr}_2$ based on the different selfsend enote types $\tau$, and $s^{sr}_1$ on a boolean value $\tt{is\_aux}$.
 \begin{align*}
     s^{sr}_1 &= \mathcal{H}_{sr1s[\tt{is\_aux}]}(k_{vb} || D_e || {\tt input\_context}) \\
     s^{sr}_2 &= \mathcal{H}_{sr2s[\tau]}(k_{vb} || s^{sr}_1)
