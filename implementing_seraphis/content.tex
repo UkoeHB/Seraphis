@@ -506,7 +506,7 @@ In contrast, Seraphis key images can be computed using the Jamtis view-balance k
 \subsection{Jamtis balance recovery}
 \label{subsec:jamtis-balance-recovery}
 
-Jamtis balance recovery can be divided into two steps: view tag checks and enote recovery. Enote recovery can occur via three different paths: `normal', `exclusive selfsend', or `auxiliary selfsend'. The main difference between all three paths is the derivation of $s^{sr}_1$. There can be different subtypes of selfsend enotes under exclusive and auxiliary, like "change" and "self-spend". The subtype is baked into the $s^{sr}_2$ and isn't needed to recompute $K^o$. As such, we only need to hash/check the complementary view tag/recompute $K^o$ a maximum of twice for selfsend enotes, while being able to support any number of selfsend types for UX purposes.
+Jamtis balance recovery can be divided into two steps: view tag checks and enote recovery. Enote recovery can occur via `normal', `exclusive selfsend', or `auxiliary selfsend' paths.
 
 \subsubsection{Primary view tag check and $D^d_{fa}$}
 \label{subsubsec:jamtis-balance-recovery-view-tag-primary}
