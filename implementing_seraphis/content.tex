@@ -416,13 +416,13 @@ As a balance recovery optimization, we include two MAC-like hashes of $D^d_{fa}$
 
 \textbf{Normal Enotes and Exclusive Selfsend Enotes}
 
-For all enotes that aren't auxiliary selfsend enotes, we compute the individual parts that make up an aggregate view tag like this:
+For all enotes that aren't auxiliary selfsend enotes, we compute the individual parts that make up an aggregate view tag like this:\vspace{.115cm}
 \begin{align*}
+    {\tt primary\_view\_tag} &= \mathcal{H}_{pvt}(D^d_{fa} || K^o) \\
+    {\tt complementary\_view\_tag} &= \mathcal{H}_{cvt}(s^{sr}_1) \\
     {\tt total\_tag\_size} &= \textit{total fixed bit size of view tag} \\
     {\tt npbits} &\in [0, {\tt total\_tag\_size}] \\
     {\tt ncbits} &= {\tt total\_tag\_size} - {\tt npbits} \\
-    {\tt primary\_view\_tag} &= \mathcal{H}_{pvt}(D^d_{fa} || K^o) \\
-    {\tt complementary\_view\_tag} &= \mathcal{H}_{cvt}(s^{sr}_1) \\
 \end{align*}
 
 Putting it all together we get\vspace{.115cm}
