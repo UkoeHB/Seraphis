@@ -508,7 +508,7 @@ In contrast, Seraphis key images can be computed using the Jamtis view-balance k
 
 Jamtis balance recovery can be divided into two steps: view tag checks and enote recovery. Enote recovery can occur via `normal', `exclusive selfsend', or `auxiliary selfsend' paths.
 
-\subsubsection{Primary view tag check and $D^d_{fa}$}
+\subsubsection{View tag checks and $D^d_{fa}$}
 \label{subsubsec:jamtis-balance-recovery-view-tag-primary}
 
 Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context}, a user who wants to see if they own the enote begins by checking its primary view tag. This requires the user's $d_{fa}$.
@@ -516,22 +516,19 @@ Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context
 \begin{enumerate}
     \item Compute the nominal key derivation: $D'^d_{fa} = d_{fa} * D_e$
 
-    \item Compute the nominal primary view tag:
-
-    ${\tt primary\_view\_tag'} = \mathcal{H}_{pvt}(D^d_{fa} || K^o)$
+    \item Compute the nominal primary view tag: ${\tt primary\_view\_tag'} = \mathcal{H}_{pvt}(D^d_{fa} || K^o)$
     
-    \item Extract the ${\tt primary\_view\_tag}$ from the ${\tt view\_tag}$
+    \item Extract the ${\tt primary\_view\_tag}$ from the ${\tt view\_tag}$ based on the configured bit-length {\tt npbits}.
 
-    \item If ${\tt primary\_view\_tag}' = {\tt primary\_view\_tag}$ then jump to the sender-receiver secret $s^{sr}_1$ derivation (\ref{subsubsec:jamtis-balance-recovery-sr1}). If any other enotes within this transaction had matching primary view tags, then the only balance recovery path left to try is the auxiliary selfsend path. Move onto the auxiliary view tag check (\ref{subsubsec:jamtis-balance-recovery-aux-check}). Otherwise, if no enotes in the transaction had matching primary view tags, ${\tt ABORT}$.
-\end{enumerate}
+    \item If ${\tt primary\_view\_tag}' \neq {\tt primary\_view\_tag}$ then perform an auxiliary view tag check:
 
-\subsubsection{Auxiliary view tag check}
-\label{subsubsec:jamtis-balance-recovery-aux-check}
+    \begin{enumerate}
+        \item If all other enotes in the transaction also failed the primary view tag check, then ${\tt ABORT}$.
 
-\begin{enumerate}
-    \item Compute the nominal auxiliary view tag ${\tt view\_tag'} = \mathcal{H}_{avt}(k_{vb} || K^o)$
-    
-    \item If ${\tt view\_tag'} \neq {\tt view\_tag}$, then ${\tt ABORT}$
+        \item Compute the nominal auxiliary view tag: ${\tt view\_tag'} = \mathcal{H}_{avt}(k_{vb} || K^o)$
+        
+        \item If ${\tt view\_tag'} \neq {\tt view\_tag}$, then ${\tt ABORT}$.
+    \end{enumerate}
 \end{enumerate}
 
 \subsubsection{Sender-Receiver secret $s^{sr}_1$ derivation}
@@ -558,7 +555,7 @@ If you are on the auxiliary selfsend balance recovery path, then you skip the co
     \[{\tt complementary\_view\_tag'} = \mathcal{H}_{cvt}(s^{sr}_1)\]
     \item Extract ${\tt complementary\_view\_tag}$ from ${\tt view\_tag}$
     
-    \item If ${\tt complementary\_view\_tag'} \neq {\tt complementary\_view\_tag}$, then ${\tt ABORT}$
+    \item If ${\tt complementary\_view\_tag'} \neq {\tt complementary\_view\_tag}$, then ${\tt ABORT}$.
 \end{enumerate}
 
 \subsubsection{Full enote recovery}
@@ -625,7 +622,7 @@ To actually perform balance recovery, users must examine enotes and key images i
 
 First, we add a rule to Jamtis to ensure all transactions containing a user's key images will have at least one output enote that passes the view tag check with that user's $d_{fa}$.
 \begin{itemize}
-    \item \textbf{Rule}: All transactions spending funds from a user's wallet must contain exactly one exclusive selfsend enote, and any number of auxiliary selfsend enotes.\footnote{To satisfy this rule, it may be necessary to add a zero-change exclusive selfsend to a transaction if there is no change enote or explicit self-spend.}
+    \item \textbf{Rule}: All transactions spending funds from a user's wallet must contain exactly one exclusive selfsend enote. All other selfsends must be auxiliary selfsend enotes.\footnote{To satisfy this rule, it may be necessary to add a zero-change exclusive selfsend to a transaction if there is no change enote or explicit self-spend.}
 \end{itemize}
 
 Now we define the balance recovery procedure.
