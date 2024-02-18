@@ -412,11 +412,11 @@ We bind to $K^o$ for robustness.\footnote{It is feasible, although unlikely, tha
 \subsubsection{Flexible view tag}
 \label{subsubsec:jamtis-enote-construction-view-tag}
 
-As a balance recovery optimization, we include two MAC-like hashes of $D^d_{fa}$ and $D^d_{vr}$ called the `primary view tag' and `complementary view tag' in enotes \cite{reduce-scan-times-view-tag-research-issue-73}. For auxiliary selfsend enotes, we also include an `auxiliary view tag`. These MAC-like hashes are spliced together into a fixed-size byte buffer called the `view tag'. To make the view tag, we concatenate a certain number of bits, ${\tt npbits}$, from the primary view tag, to another ${\tt ncbits}$ from the complementary view tag. A person doing balance recovery can recompute the primary/complementary/auxiliary view tags for a given enote and check them against the stored aggregate view tag. If the computed sub-tags don't match against their bit ranges in the aggregate tag, then most of the other balance recovery steps, especially the most expensive steps, can be skipped.\footnote{Each primary/complementary view tag only needs to be 1 or 2 bytes to effectively amortize post-view-tag computations.}
+As a balance recovery optimization, we compute two MAC-like hashes of $D^d_{fa}$ and $D^d_{vr}$ called the `primary view tag' and `complementary view tag' \cite{reduce-scan-times-view-tag-research-issue-73} for normal and exclusive selfsend enotes (auxiliary selfsend enotes instead use an `auxiliary view tag'). These MAC-like hashes are spliced together into a fixed-size byte buffer called the `view tag', which is included in enotes. A person doing balance recovery can recompute the primary/complementary/auxiliary view tags for a given enote and check them against the stored aggregate view tag. If the computed sub-tags don't match against their bit ranges in the aggregate tag, then most of the other balance recovery steps, especially the most expensive steps, can be skipped.\footnote{Aggregate view tags only need to be 1 or 2 bytes to effectively amortize post-view-tag computations.}
 
 \textbf{Normal Enotes and Exclusive Selfsend Enotes}
 
-For all enotes that aren't auxiliary selfsend enotes, we compute the individual parts that make up an aggregate view tag like this:\vspace{.115cm}
+To make the view tag for normal and exclusive selfsend enotes, we concatenate a configurable number of bits, ${\tt npbits}$, from the primary view tag, to another ${\tt ncbits}$ from the complementary view tag.
 \begin{align*}
     {\tt primary\_view\_tag} &= \mathcal{H}_{pvt}(D^d_{fa} || K^o) \\
     {\tt complementary\_view\_tag} &= \mathcal{H}_{cvt}(s^{sr}_1) \\
@@ -425,7 +425,7 @@ For all enotes that aren't auxiliary selfsend enotes, we compute the individual 
     {\tt ncbits} &= {\tt total\_tag\_size} - {\tt npbits} \\
 \end{align*}
 
-Putting it all together we get\vspace{.115cm}
+With
 \[ {\tt view\_tag} = \textrm{{\tt primary\_view\_tag}[ : {\tt npbits}] } || \textrm{ {\tt complementary\_view\_tag}[ : {\tt ncbits}]} \]
 
 where $x[:{b}]$ means `get $b$ bits of the byte-wise representation of $x$'. To differentiate between these view tags and `auxiliary' view tags, we call these `flagship' view tags (see why later below).
@@ -433,15 +433,15 @@ where $x[:{b}]$ means `get $b$ bits of the byte-wise representation of $x$'. To 
 
 \textbf{Auxiliary Selfsend Enotes}
 
-Auxiliary selfsend enotes have a different, but much simpler, view tag derivation path:
+Auxiliary selfsend enotes have a different, but much simpler, view tag derivation path:\vspace{.115cm}
 \[ {\tt view\_tag} = \mathcal{H}_{avt}(k_{vb} || K^o) \]
 
 
-\textbf{Why Different View Tag Types?}
+\textbf{Primary/Complementary/Auxiliary Distinction}
 
-The reason that we have different types of view tags is to prevent the Filter-assist tier from making educated guesses about which enotes are owned selfsend enotes, based on the number of primary view tag matches within a transaction. At a high level, this protection lets users who have offloaded their Filter-assist tier to a third party to perform enote `churning' and `pocket change'-like features without additional loss of privacy.
+The reason we have different types of view tags is to prevent the filter-assist tier from making educated guesses about which enotes are owned selfsend enotes, based on the number of primary view tag matches within a transaction. At a high level, this protection lets users who have offloaded their filter-assist tier to a third party to perform enote `churning' and `pocket change'-like features without additional loss of privacy.
 
-Let's say that ${\tt npbits} = 8$. This means that the primary view tag can take on $2^{\tt npbits} = 256$ unique values. Considering that probability of encountering any given primary view tag value for unrelated enotes is uniformly distributed, you would expect to get primary view tag matches once every $256$ enotes. If all of your outgoing transactions contain exactly one selfsend enote, meaning one view tag match, and the number of outgoing transactions is negligible compared to the total number of transactions that exist in the ledger, then the Filter-assist tier will have little to no usable information to extract regarding which enotes are owned selfsend enotes.
+Let's say that ${\tt npbits} = 8$. This means that the primary view tag can take on $2^{\tt npbits} = 256$ unique values. Considering that probability of encountering any given primary view tag value for unrelated enotes is uniformly distributed, you would expect to get primary view tag matches once every $256$ enotes. If all of your outgoing transactions contain exactly one selfsend enote, meaning one view tag match, and the number of outgoing transactions is negligible compared to the total number of transactions that exist in the ledger, then the filter-assist tier will have little to no usable information to extract regarding which enotes are owned selfsend enotes.
 
 But what happens when the user constructs multiple selfsend enotes within the same transaction? As an extreme example, let's say that one wants to split up one enote worth 16 into 16 enotes worth 1 each (perhaps as a workaround to the 10-block-lock). To do this, the transaction author would create 16 selfsend enotes. The problem with this is that if all of those enotes have matching view tags, it is more or less probabilitically guaranteed from the perspective of anyone with knowledge of $d_{fa}$ that a the creator of these enotes is sending funds to this account. For any group of 16 enotes, the probability that all 16 enotes have a matching view tag (assuming again that ${\tt npbits}=8$) from a sender sending to an unrelated account is 
 $1 / ((2^{\tt npbits})^{16}) = 2^{-128}$, the same chance as randomly guessing someone's AES-128 private key on the first try! This would make for extremely strong heuristics against light wallet users' privacy.
