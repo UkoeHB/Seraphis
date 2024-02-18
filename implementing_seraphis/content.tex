@@ -412,11 +412,11 @@ We bind to $K^o$ for robustness.\footnote{It is feasible, although unlikely, tha
 \subsubsection{Flexible view tag}
 \label{subsubsec:jamtis-enote-construction-view-tag}
 
-As a balance recovery optimization, we include two MAC-like hashes of $D^d_{fa}$ and $D^d_{vr}$ called the `primary view tag' and `complementary view tag' in enotes \cite{reduce-scan-times-view-tag-research-issue-73}. For auxiliary selfsend enotes, we also include an `auxiliary view tag`. These MAC-like hashes are spliced together into a fixed-size byte buffer which is called the `view tag'. To make the view tag, we concatenate a certain number of bits, ${\tt npbits}$, from the primary view tag, to another certain number of bits, ${\tt ncbits}$ from the complementary view tag. A person doing balance recovery can recompute the primary/complementary/auxiliary view tags for a given enote and check them against the stored view tag. If the computed sub-tags don't match against their bit ranges in the aggregate tag, then most of the other balance recovery steps, especially the most expensive steps, can be skipped.\footnote{Each primary/complementary view tag only needs to be 1 or 2 bytes to effectively amortize post-view-tag computations.}
+As a balance recovery optimization, we include two MAC-like hashes of $D^d_{fa}$ and $D^d_{vr}$ called the `primary view tag' and `complementary view tag' in enotes \cite{reduce-scan-times-view-tag-research-issue-73}. For auxiliary selfsend enotes, we also include an `auxiliary view tag`. These MAC-like hashes are spliced together into a fixed-size byte buffer called the `view tag'. To make the view tag, we concatenate a certain number of bits, ${\tt npbits}$, from the primary view tag, to another ${\tt ncbits}$ from the complementary view tag. A person doing balance recovery can recompute the primary/complementary/auxiliary view tags for a given enote and check them against the stored aggregate view tag. If the computed sub-tags don't match against their bit ranges in the aggregate tag, then most of the other balance recovery steps, especially the most expensive steps, can be skipped.\footnote{Each primary/complementary view tag only needs to be 1 or 2 bytes to effectively amortize post-view-tag computations.}
 
 \textbf{Normal Enotes and Exclusive Selfsend Enotes}
 
-For all enotes that aren't auxiliary selfsend enotes, here is how we compute all the individual parts that make up a view tag:
+For all enotes that aren't auxiliary selfsend enotes, we compute the individual parts that make up an aggregate view tag like this:
 \begin{align*}
     {\tt total\_tag\_size} &= \textit{total fixed bit size of view tag} \\
     {\tt npbits} &\in [0, {\tt total\_tag\_size}] \\
@@ -425,8 +425,8 @@ For all enotes that aren't auxiliary selfsend enotes, here is how we compute all
     {\tt complementary\_view\_tag} &= \mathcal{H}_{cvt}(s^{sr}_1) \\
 \end{align*}
 
-Putting it all together and we get:
-\[ {\tt view\_tag} = {\tt primary\_view\_tag}[\\:{\tt npbits}] || {\tt complementary\_view\_tag}[\\:{\tt ncbits}] \]
+Putting it all together we get\vspace{.115cm}
+\[ {\tt view\_tag} = \textrm{{\tt primary\_view\_tag}[ : {\tt npbits}] } || \textrm{ {\tt complementary\_view\_tag}[ : {\tt ncbits}]} \]
 
 where $x[:{b}]$ means `get $b$ bits of the byte-wise representation of $x$'. To differentiate between these view tags and `auxiliary' view tags, we call these `flagship' view tags (see why later below).
 
