@@ -544,7 +544,7 @@ We then compute the sender-receiver secret $s^{sr}_1$ (domain-separated by {\tt 
 \end{itemize}
 
 \begin{enumerate}
-    \item Compute the first enote secret
+    \item Compute the first enote secret:
         \begin{itemize}
             \item \textbf{Normal scan}:
             \begin{enumerate}
@@ -591,7 +591,7 @@ With $j'$ in hand, the user can recompute $K^o$. This requires $s'^{sr}_1$ and t
     \item If $K'^o \neq K^o$ then {\tt ABORT}.
 \end{enumerate}
 
-Now the user is prepared to recover the enote amount.\footnote{These steps are not required for coinbase enotes, which record the amount $a$ explicitly.} Selfsend scanning will test a trial selfsend type $\tau$. In selfsend scanning, if one $\tau$ fails then other values of $\tau$ can be tried.
+Now the user is prepared to recover the enote amount.\footnote{These steps are not required for coinbase enotes, which record the amount $a$ explicitly.} Selfsend scanning will iteratively test selfsend types $\tau$ until success.
 
 \begin{itemize}
     \item \textbf{Normal scan}: This requires $s'^{sr}_1, j', s^{j'}_{gen}$, and the user's $d_{vr}$ and $K_s$.
@@ -607,7 +607,7 @@ Now the user is prepared to recover the enote amount.\footnote{These steps are n
                 \item Compute the address private key of $j'$: $d^{j'}_a = \mathcal{H}^n_{ap}(K_s || j' || s^{j'}_{gen})$
                 \item Compute the secret: $s'^{sr}_2 = \mathcal{H}_{sr2n}((1/(d^{j'}_a * d_{vr})) * K_e)$
             \end{enumerate}
-        \item \textbf{Selfsend scan}: $s'^{sr}_2 = \mathcal{H}_{sr2s[\tau]}(k_{vb} || s^{sr}_1)$
+        \item \textbf{Selfsend scan}: $s'^{sr}_2 = \mathcal{H}_{sr2s[\tau]}(k_{vb} || s'^{sr}_1)$
     \end{itemize}
 
     \item Decrypt the nominal amount: $a' = a_{enc} \textrm{ \tt  XOR } \mathcal{H}_{ea}(s'^{sr}_1 || s'^{sr}_2)$
