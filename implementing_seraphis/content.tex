@@ -474,7 +474,7 @@ Jamtis encrypted address tags cleanly solve this issue by enabling users to dire
 \subsubsection{Janus attack}
 \label{subsubsec:jamtis-cryptonote-flaws-janus}
 
-CryptoNote balance recovery involves a two-part process. First is an ECDH exchange using the CryptoNote view key to get a shared secret (much like $D^d_{vr}$). Then the shared secret is used to unwrap the spend key of the address that owns the enote (similar to $K^j_s$).
+CryptoNote balance recovery involves a two-part process. First is an ECDH exchange using the CryptoNote view key to get a shared secret (much like $D^d_{vr}$ and $D^d_{fa}$). Then the shared secret is used to unwrap the spend key of the address that owns the enote (similar to $K^j_s$).
 
 Since that two-part process is separated, it is possible for each part to be constructed from a different subaddress. A transaction author can optimistically make an enote from two subaddresses they suspect are owned by the same person. Their theory will be confirmed if that person notifies the author they received the enote. This is called a `Janus attack' \cite{janus-attack}.
 
@@ -486,10 +486,10 @@ Jamtis solves this by binding enote contents to the index $j$ of the recipient a
 
     \item The recipient recomputes onetime address $K^o$ using $K_s$, $j$, and $D^d_{vr}$.
 
-    \item The recipient computes the second secret $s^{sr}_2$ from the values $1/(d^j_a * d_{vr}) * D_e$.
+    \item The recipient computes the second secret $s^{sr}_2$ from the values $(1/(d^j_a * d_{vr})) * D_e$.
 \end{enumerate}
 
-The key here is in the last point. Specifically, $s^{sr}_2$ depends on both $D^d_{vr}$ and the recovered $j$. If the recovered $j$ does not match the $j'$ of the key $K^{j'}_{base}$ used to construct $D_e = r K^{j'}_{base}$, then the user will compute a different $s^{sr}_2$ from the transaction author.
+The key here is in the last point. Specifically, $s^{sr}_2$ depends on both $D^d_{vr}$ and the recovered $j$. If the recovered $j$ does not match the $j'$ of the key $D^{j'}_{base}$ used to construct $D_e = r D^{j'}_{base}$, then the user will compute a different $s^{sr}_2$ from the transaction author.
 
 In detail, the user will compute $s^{sr}_2$ with the ECDH key $1/(d^j_a * d_{vr}) * D_e = r * (d^{j'}_a/d^{j}_a) * G$, which the transaction author cannot know since one of $d^{j}_a$ and $d^{j'}_a$ are secrets. Additionally, if an attacker does know one address private key, they still cannot compute inverse Diffie-Helman exchange the way the recipient would ($1/(d^j_a * d_{vr}) * D_e$) since they would also need to know $d_{vr}$. Therefore if a user recovers $s^{sr}_2$ successfully (which can be verified by reproducing $C$ correctly), and assuming $K^o$ was recomputed properly, then the transaction author must have used address components derived from the same index $j$.
 
