@@ -508,7 +508,7 @@ In contrast, Seraphis key images can be computed using the Jamtis view-balance k
 
 Jamtis balance recovery can be divided into two steps: view tag checks and enote recovery. Enote recovery can occur via `normal', `exclusive selfsend', or `auxiliary selfsend' paths.
 
-\subsubsection{View tag checks and $D^d_{fa}$}
+\subsubsection{Primary view tag check and $D^d_{fa}$}
 \label{subsubsec:jamtis-balance-recovery-view-tag-primary}
 
 Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context}, a user who wants to see if they own the enote begins by checking its primary view tag. This requires the user's $d_{fa}$.
@@ -520,43 +520,47 @@ Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context
     
     \item Extract the ${\tt primary\_view\_tag}$ from the ${\tt view\_tag}$ based on the configured bit-length {\tt npbits}.
 
-    \item If ${\tt primary\_view\_tag}' \neq {\tt primary\_view\_tag}$ then perform an auxiliary view tag check:
+    \item If ${\tt primary\_view\_tag}' == {\tt primary\_view\_tag}$ then set {\tt is\_aux = false}, otherwise perform an auxiliary view tag check:
 
     \begin{enumerate}
         \item If all other enotes in the transaction also failed the primary view tag check, then ${\tt ABORT}$.
 
         \item Compute the nominal auxiliary view tag: ${\tt view\_tag'} = \mathcal{H}_{avt}(k_{vb} || K^o)$
         
-        \item If ${\tt view\_tag'} \neq {\tt view\_tag}$, then ${\tt ABORT}$.
+        \item If ${\tt view\_tag'} == {\tt view\_tag}$ then set {\tt is\_aux = true}, otherwise ${\tt ABORT}$.
     \end{enumerate}
 \end{enumerate}
 
-\subsubsection{Sender-Receiver secret $s^{sr}_1$ derivation}
-\label{subsubsec:jamtis-balance-recovery-sr1}
+\subsubsection{Complementary view tag check and $s^{sr}_1$}
+\label{subsubsec:jamtis-balance-recovery-view-tag-complementary}
 
-We the use the sender-receiver secret $s^{sr}_1$ to 1) decrypt the address tag and 2) recompute $K^o$. You may notice that we need to do a Diffie-Helman exchange on the normal path, and not on the selfsend path. In practice, this means that testing for a selfsend is much, much faster than checking for a normal enote.
+We then compute the sender-receiver secret $s^{sr}_1$ (domain-separated by {\tt is\_aux}), and perform a complementary view tag check for enotes with {\tt is\_aux == false}.
 
 \begin{itemize}
-        \item \textbf{Normal scan}:
-        \begin{enumerate}
-            \item $D'^d_{vr} = d_{vr} * D_e$
-            \item $s'^{sr}_1 = \mathcal{H}_{sr1n}(D'^d_{vr} || D_e || \texttt{input\_context})$
-        \end{enumerate}
-        \item \textbf{Selfsend scan}: $s'^{sr}_1 = \mathcal{H}_{sr1s[{\tt is\_aux}]}(k_{vb} || D_e || {\tt input\_context})$
+    \item \textbf{Normal scan}: This requires $d_{vr}$.
+    \item \textbf{Selfsend scan}: This requires $k_{vb}$.
 \end{itemize}
 
-\subsubsection{Complementary view tag check}
-\label{subsubsec:jamtis-balance-recovery-comp-check}
-
-If you are on the auxiliary selfsend balance recovery path, then you skip the complementary view tag check. Otherwise, for normal and exclusive selfsend paths, checking the complementary view tag allows us to abort early most of the time, skipping the expensive $K^o$ recomputation.
-
 \begin{enumerate}
-    \item Compute the nominal complementary view tag
-    \[{\tt complementary\_view\_tag'} = \mathcal{H}_{cvt}(s^{sr}_1)\]
-    \item Extract ${\tt complementary\_view\_tag}$ from ${\tt view\_tag}$
-    
-    \item If ${\tt complementary\_view\_tag'} \neq {\tt complementary\_view\_tag}$, then ${\tt ABORT}$.
+    \item Compute the first enote secret
+        \begin{itemize}
+            \item \textbf{Normal scan}:
+            \begin{enumerate}
+                \item Compute the nominal view-received derivation: $D'^d_{vr} = d_{vr} * D_e$
+                \item $s'^{sr}_1 = \mathcal{H}_{sr1n}(D'^d_{vr} || D_e || \texttt{input\_context})$
+            \end{enumerate}
+            \item \textbf{Selfsend scan}: $s'^{sr}_1 = \mathcal{H}_{sr1s[{\tt is\_aux}]}(k_{vb} || D_e || {\tt input\_context})$
+        \end{itemize}
+    \item If {\tt is\_aux == false} then perform a complementary view tag check
+        \begin{enumerate}
+            \item Compute the nominal complementary view tag: ${\tt complementary\_view\_tag'} = \mathcal{H}_{cvt}(s^{sr}_1)$
+            \item Extract the ${\tt complementary\_view\_tag}$ from the ${\tt view\_tag}$ based on the configured bit-length {\tt ncbits}.
+            
+            \item If ${\tt complementary\_view\_tag'} \neq {\tt complementary\_view\_tag}$, then ${\tt ABORT}$.
+        \end{enumerate}
 \end{enumerate}
+
+Note that the normal scan requires a Diffie-Helman exchange, but the selfsend scan does not. This means that testing for a selfsend is significantly faster than testing for a normal enote.
 
 \subsubsection{Full enote recovery}
 \label{subsubsec:jamtis-balance-recovery-enote}
