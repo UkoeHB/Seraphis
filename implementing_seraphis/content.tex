@@ -366,7 +366,7 @@ In this case $s^{sr}_2$ does not rely on the inverse Diffie-Hellman secret $r G$
 
 \textbf{Uniqueness}: To ensure uniqueness of $s^{sr}_1$ and $s^{sr}_2$ when $D_e$ is shared between two enotes, transaction authors must avoid sharing $D_e$ between two selfsend enotes of the same class (i.e. if there are two selfsend enotes in one transaction, then one must be exclusive and the other must be auxiliary). The secrets will be unique in the case of $D_e$ shared between a plain and a selfsend enote since the $s^{sr}_1$ derivation will be different for each.
 
-\textbf{Optimized design}: Selfsend enote secrets can be computed with three hash operations (including the input context), whereas normal enote secrets require three hash operations, and three ECDH exchanges.
+\textbf{Optimized design}: Selfsend enote secrets can be computed with three hash operations (including the input context), whereas normal enote secrets require three hash operations, one scalar inversion, and three ECDH exchanges.
 
 
 \subsection{Jamtis enote construction}
