@@ -553,7 +553,7 @@ We then compute the sender-receiver secret $s^{sr}_1$ (domain-separated by {\tt 
             \end{enumerate}
             \item \textbf{Selfsend scan}: $s'^{sr}_1 = \mathcal{H}_{sr1s[{\tt is\_aux}]}(k_{vb} || D_e || {\tt input\_context})$
         \end{itemize}
-    \item If {\tt is\_aux == false} then perform a complementary view tag check
+    \item If {\tt is\_aux == false} then perform a complementary view tag check:
         \begin{enumerate}
             \item Compute the nominal complementary view tag: ${\tt complementary\_view\_tag'} = \mathcal{H}_{cvt}(s^{sr}_1)$
             \item Extract the ${\tt complementary\_view\_tag}$ from the ${\tt view\_tag}$ based on the configured bit-length {\tt ncbits}.
@@ -607,7 +607,7 @@ Now the user is prepared to recover the enote amount.\footnote{These steps are n
                 \item Compute the address private key of $j'$: $d^{j'}_a = \mathcal{H}^n_{ap}(K_s || j' || s^{j'}_{gen})$
                 \item Compute the secret: $s'^{sr}_2 = \mathcal{H}_{sr2n}((1/(d^{j'}_a * d_{vr})) * K_e)$
             \end{enumerate}
-        \item \textbf{Selfsend scan}: $s'^{sr}_2 = \mathcal{H}_{sr2s[\tau]}(k_{vb} || s'^{sr}_1)$
+        \item \textbf{Selfsend scan}: $s'^{sr}_2 = \mathcal{H}_{sr2s[\tau]}(k_{vb} || s^{sr}_1)$
     \end{itemize}
 
     \item Decrypt the nominal amount: $a' = a_{enc} \textrm{ \tt  XOR } \mathcal{H}_{ea}(s'^{sr}_1 || s'^{sr}_2)$
@@ -669,26 +669,23 @@ The Jamtis key structure and balance recovery design lends itself to a well-defi
     \item \textbf{Master} ($k_{vb}, k_m$): View the entire user's balance and make ownership/unspentness proofs for all enotes.
 \end{itemize}
 
-Here we see the value of $d_{vr}$, which separates payment validators from the find-received and generate-address wallet tiers.
+Here we see the value of $d_{vr}$, which separates payment validators from the filter-assist and generate-address wallet tiers.
 
 \subsubsection{Remote-assisted balance recovery}
 \label{subsubsec:jamtis-wallets-remote-assisted}
 
-A user can set up a remote filter-assist wallet that creates basic records from enotes in the ledger and passes those records to their local view-balance wallet (or payment validator). There are several important details to highlight.
+A user can set up a remote filter-assist wallet that passes filtered enotes to their local view-balance wallet (or payment validator). There are several important details to highlight.
 \begin{itemize}
-    \item An filter-assist wallet has very limited information about the user's owned enotes.
-    \begin{enumerate}
-        \item It can perform primary view tag checks on all enotes, which essentially filters down the set of enotes `possibly owned by the user'.
-    \end{enumerate}
+    \item A filter-assist wallet has very limited information about the user's owned enotes. It can only perform primary tag checks on enotes, which merely filters down the set of enotes `possibly owned by the user'.
 
-    \item An filter-assist wallet only has to transmit basic records of enotes that pass primary view tag checks, auxiliary records of enotes in transactions which have at least one enote that passes the primary view tag check, and key images associated with those enotes to the user. This amounts to a substantial relative reduction in data that a user needs to access compared to the remote wallet, even if view tags are only 8 bits (a ~128:1 reduction).
+    \item A filter-assist wallet only has to transmit enotes that pass primary view tag checks and all other enotes in those enotes' transactions (since they may pass the auxiliary view tag check, which requires $k_{vb}$), and key images associated with those enotes to the user. This amounts to a substantial relative reduction in data that a user needs to access compared to the remote wallet, even if primary view tags are only 8 bits (a ~128:1 reduction).
 
-    \item The first step that a user needs to do to process a basic record is check the complementary view tag.
+    \item The first step that a user needs to do to process an enote received from a filter-assist wallet is check the auxiliary and complementary view tags. Complementary view tags require a Diffie-Hellman exchange to compute $D^d_{vr}$, which means normal enote scanning for the user has similar cost on a per-enote basis to the filter-assist wallet (per enote that passed a primary view tag check).
 
-    \item The user will only look for selfsend enotes in transactions containing the key images of their owned enotes. Moreover, despite the selfsend path needing to decrypt the encrypted address tag before doing a hint check, doing so is very cheap since $s^{sr}_1$ for selfsends is derived from $k_{vb}$ instead of $D^d_{vr}$. Overall this means checking for selfsends has very low relative computation cost.
+    \item The user only needs to look for selfsend enotes in transactions containing the key images of their owned enotes. Overall this means checking for selfsends has very low relative computation cost.
 \end{itemize}
 
-The result is highly constrained information access for the remote filter-assist wallet and very quick balance recovery for the user.
+The result is highly constrained information access for the remote filter-assist wallet and speedy balance recovery for the user.
 
 \subsubsection{Primary/Complementary/Auxiliary Distinction}
 \label{subsubsec:jamtis-wallets-view-tag-distinction}
