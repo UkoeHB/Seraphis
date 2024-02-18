@@ -401,6 +401,8 @@ We will justify the use of three extensions in Section \ref{subsec:jamtis-forwar
 
 Onetime addresses are bound to an {\tt input\_context} via $s^{sr}_1$ so that they will be unique in the ledger, however acquiring an input context requires {\em access} to the ledger. If access to the ledger is intermediated by a semi-trusted third party, it is possible for that party to send false input contexts to a person engaging in balance recovery. If that third party collaborates with a transaction author, they could cause the person doing balance recovery to identify owned enotes with duplicate onetime addresses. To mitigate that risk, onetime addresses are bound to the amount commitment $C$, ensuring that even if a person is using falsified input contexts during balance recovery, they will only identify duplicate-$K^o$ enotes that have the exact same amounts. This makes it safe to completely ignore all but the oldest copy of the enote.\footnote{If enotes are associated with memos containing critical information, then ignoring newer duplicate-$K^o$ enotes may not be safe.}\footnote{We keep track of the oldest copy instead of the newest copy in case of ledger reorganizations that remove newer copies but leave older ones untouched.}
 
+Note that binding to $C$ also means that selfsend enotes transitively bind to $\tau$, ensuring $K_o$ is fully dependent on all enote parameters.
+
 \subsubsection{Encrypted address tag}
 \label{subsubsec:jamtis-enote-construction-encrypted-addr-tag}
 
@@ -514,7 +516,7 @@ Jamtis balance recovery can be divided into two steps: view tag checks and enote
 Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context}, a user who wants to see if they own the enote begins by checking its primary view tag. This requires the user's $d_{fa}$.
 
 \begin{enumerate}
-    \item Compute the nominal key derivation: $D'^d_{fa} = d_{fa} * D_e$
+    \item Compute the nominal filter-assist key derivation: $D'^d_{fa} = d_{fa} * D_e$
 
     \item Compute the nominal primary view tag: ${\tt primary\_view\_tag'} = \mathcal{H}_{pvt}(D^d_{fa} || K^o)$
     
@@ -523,7 +525,7 @@ Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context
     \item If ${\tt primary\_view\_tag}' == {\tt primary\_view\_tag}$ then set {\tt is\_aux = false}, otherwise perform an auxiliary view tag check:
 
     \begin{enumerate}
-        \item If all other enotes in the transaction also failed the primary view tag check, then ${\tt ABORT}$.
+        \item If all other enotes in the transaction also failed the primary view tag check then ${\tt ABORT}$.
 
         \item Compute the nominal auxiliary view tag: ${\tt view\_tag'} = \mathcal{H}_{avt}(k_{vb} || K^o)$
         
@@ -556,7 +558,7 @@ We then compute the sender-receiver secret $s^{sr}_1$ (domain-separated by {\tt 
             \item Compute the nominal complementary view tag: ${\tt complementary\_view\_tag'} = \mathcal{H}_{cvt}(s^{sr}_1)$
             \item Extract the ${\tt complementary\_view\_tag}$ from the ${\tt view\_tag}$ based on the configured bit-length {\tt ncbits}.
             
-            \item If ${\tt complementary\_view\_tag'} \neq {\tt complementary\_view\_tag}$, then ${\tt ABORT}$.
+            \item If ${\tt complementary\_view\_tag'} \neq {\tt complementary\_view\_tag}$ then ${\tt ABORT}$.
         \end{enumerate}
 \end{enumerate}
 
@@ -565,9 +567,7 @@ Note that the normal scan requires a Diffie-Helman exchange, but the selfsend sc
 \subsubsection{Full enote recovery}
 \label{subsubsec:jamtis-balance-recovery-enote}
 
-Once an enote has been flagged as `possibly owned' by matching the appropriate view tag, full enote recovery can proceed.
-
-In selfsend scanning, if one $\tau$ fails when recomputing the amount commitment then other values of $\tau$ can be tried. Selfsend $\tau$ checks are cheap since we only do it after we have successfully recomputed the onetime address, which means it was addressed to us.
+Once an enote has been flagged as `possibly owned’, full enote recovery can proceed.
 
 \begin{enumerate}
     \item Compute the nominal address tag: ${\tt addr\_tag}' = \textrm{\tt addr\_tag\_enc XOR } \mathcal{H}_{ate}(s'^{sr}_1 || K^o)$
@@ -582,16 +582,17 @@ With $j'$ in hand, the user can recompute $K^o$. This requires $s'^{sr}_1$ and t
 
     \item Compute the spendkey extensions of $j'$ for $G$, $X$, and $U$: $k^{j'}_{[g/x/u]} = \mathcal{H}^n_{se[g/x/u]}(K_s || j' || s^{j'}_{gen})$
 
-    \item Compute the address spend key of $j'$: $K^{j'}_1 = k^{j'}_g G + k^{j'}_x X + k^{j'}_u U + K_s$
+    \item Compute the address spend key of $j'$: $K^{j'}_s = k^{j'}_g G + k^{j'}_x X + k^{j'}_u U + K_s$
 
-    \item Compute the nominal onetime address extensions: $k'^o_{[g/x/u]} = \mathcal{H}^n_{ko[g/x/u]}(K^{j'}_1 || s'^{sr}_1 || C)$
+    \item Compute the nominal onetime address extensions: $k'^o_{[g/x/u]} = \mathcal{H}^n_{ko[g/x/u]}(K^{j'}_s || s'^{sr}_1 || C)$
 
-    \item Compute the nominal onetime address: $K'^o = k'^o_g G + k'^o_x X + k'^o_u U + K^{j'}_1$
+    \item Compute the nominal onetime address: $K'^o = k'^o_g G + k'^o_x X + k'^o_u U + K^{j'}_s$
 
     \item If $K'^o \neq K^o$ then {\tt ABORT}.
 \end{enumerate}
 
-Now the user is prepared to recover the enote amount.\footnote{These steps are not required for coinbase enotes, which record the amount $a$ explicitly.}
+Now the user is prepared to recover the enote amount.\footnote{These steps are not required for coinbase enotes, which record the amount $a$ explicitly.} Selfsend scanning will test a trial selfsend type $\tau$. In selfsend scanning, if one $\tau$ fails then other values of $\tau$ can be tried.
+
 \begin{itemize}
     \item \textbf{Normal scan}: This requires $s'^{sr}_1, j', s^{j'}_{gen}$, and the user's $d_{vr}$ and $K_s$.
 
