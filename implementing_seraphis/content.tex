@@ -412,7 +412,7 @@ We bind to $K^o$ for robustness.\footnote{It is feasible, although unlikely, tha
 \subsubsection{Flexible view tag}
 \label{subsubsec:jamtis-enote-construction-view-tag}
 
-As a balance recovery optimization, we include two MAC-like hashes of $D^d_{fa}$ and $D^d_{vr}$ called the `primary` and `complementary' `view tags parts' in enotes \cite{reduce-scan-times-view-tag-research-issue-73}. For auxiliary selfsend enotes, we also include a view tag part called the `auxiliary view tag part`. These MAC-like hashes are spliced together into a fixed-size byte buffer which is called the `view tag'. To make the view tag, we concatenate a certain number of bits, ${\tt npbits}$, from the primary view tag part, to another certain number of bits, ${\tt ncbits}$ from the complementary view tag part. A person doing balance recovery can recompute the primary/complementary/auxiliary view tag parts for a given enote and check it against the stored view tag. If the view tags don't match, then most of the other balance recovery steps, especially the most expensive steps, can be skipped. \footnote{Each primary/complementary view tag part only needs to be 1 or 2 bytes to effectively amortize post-view-tag computations.}
+As a balance recovery optimization, we include two MAC-like hashes of $D^d_{fa}$ and $D^d_{vr}$ called the `primary view tag' and `complementary view tag' in enotes \cite{reduce-scan-times-view-tag-research-issue-73}. For auxiliary selfsend enotes, we also include an `auxiliary view tag`. These MAC-like hashes are spliced together into a fixed-size byte buffer which is called the `view tag'. To make the view tag, we concatenate a certain number of bits, ${\tt npbits}$, from the primary view tag, to another certain number of bits, ${\tt ncbits}$ from the complementary view tag. A person doing balance recovery can recompute the primary/complementary/auxiliary view tags for a given enote and check them against the stored view tag. If the computed sub-tags don't match against their bit ranges in the aggregate tag, then most of the other balance recovery steps, especially the most expensive steps, can be skipped.\footnote{Each primary/complementary view tag only needs to be 1 or 2 bytes to effectively amortize post-view-tag computations.}
 
 \textbf{Normal Enotes and Exclusive Selfsend Enotes}
 
@@ -421,12 +421,12 @@ For all enotes that aren't auxiliary selfsend enotes, here is how we compute all
     {\tt total\_tag\_size} &= \textit{total fixed bit size of view tag} \\
     {\tt npbits} &\in [0, {\tt total\_tag\_size}] \\
     {\tt ncbits} &= {\tt total\_tag\_size} - {\tt npbits} \\
-    {\tt primary\_view\_tag\_part} &= \mathcal{H}_{pvt}(D^d_{fa} || K^o) \\
-    {\tt complementary\_view\_tag\_part} &= \mathcal{H}_{cvt}(s^{sr}_1) \\
+    {\tt primary\_view\_tag} &= \mathcal{H}_{pvt}(D^d_{fa} || K^o) \\
+    {\tt complementary\_view\_tag} &= \mathcal{H}_{cvt}(s^{sr}_1) \\
 \end{align*}
 
 Putting it all together and we get:
-\[ {\tt view\_tag} = {\tt primary\_view\_tag\_part}[\\:{\tt npbits}] || {\tt complementary\_view\_tag\_part}[\\:{\tt ncbits}] \]
+\[ {\tt view\_tag} = {\tt primary\_view\_tag}[\\:{\tt npbits}] || {\tt complementary\_view\_tag}[\\:{\tt ncbits}] \]
 
 where $x[:{b}]$ means `get $b$ bits of the byte-wise representation of $x$'. To differentiate between these view tags and `auxiliary' view tags, we call these `flagship' view tags (see why later below).
 
@@ -439,14 +439,14 @@ Auxiliary selfsend enotes have a different, but much simpler, view tag derivatio
 
 \textbf{Why Different View Tag Types?}
 
-The reason that we have different types of view tags is to prevent the Filter-assist tier from making educated guesses about which enotes are owned selfsend enotes, based on the number of primary view tag part matches within a transaction. At a high level, this protection lets users who have offloaded their Filter-assist tier to a third party to perform enote `churning' and `pocket change'-like features without additional loss of privacy.
+The reason that we have different types of view tags is to prevent the Filter-assist tier from making educated guesses about which enotes are owned selfsend enotes, based on the number of primary view tag matches within a transaction. At a high level, this protection lets users who have offloaded their Filter-assist tier to a third party to perform enote `churning' and `pocket change'-like features without additional loss of privacy.
 
-Let's say that ${\tt npbits} = 8$. This means that the primary view tag part can take on $2^{\tt npbits} = 256$ unique values. Considering that probability of encountering any given primary view tag value for unrelated enotes is uniformly distributed, you would expect to get primary view tag matches once every $256$ enotes. If all of your outgoing transactions contain exactly one selfsend enote, meaning one view tag match, and the number of outgoing transactions is negligible compared to the total number of transactions that exist in the ledger, then the Filter-assist tier will have little to no usable information to extract regarding which enotes are owned selfsend enotes.
+Let's say that ${\tt npbits} = 8$. This means that the primary view tag can take on $2^{\tt npbits} = 256$ unique values. Considering that probability of encountering any given primary view tag value for unrelated enotes is uniformly distributed, you would expect to get primary view tag matches once every $256$ enotes. If all of your outgoing transactions contain exactly one selfsend enote, meaning one view tag match, and the number of outgoing transactions is negligible compared to the total number of transactions that exist in the ledger, then the Filter-assist tier will have little to no usable information to extract regarding which enotes are owned selfsend enotes.
 
 But what happens when the user constructs multiple selfsend enotes within the same transaction? As an extreme example, let's say that one wants to split up one enote worth 16 into 16 enotes worth 1 each (perhaps as a workaround to the 10-block-lock). To do this, the transaction author would create 16 selfsend enotes. The problem with this is that if all of those enotes have matching view tags, it is more or less probabilitically guaranteed from the perspective of anyone with knowledge of $d_{fa}$ that a the creator of these enotes is sending funds to this account. For any group of 16 enotes, the probability that all 16 enotes have a matching view tag (assuming again that ${\tt npbits}=8$) from a sender sending to an unrelated account is 
 $1 / ((2^{\tt npbits})^{16}) = 2^{-128}$, the same chance as randomly guessing someone's AES-128 private key on the first try! This would make for extremely strong heuristics against light wallet users' privacy.
 
-For this reason, we introduce the distinction between exclusive and auxiliary selfsend enotes. Each transaction that one creates should have exactly one exclusive selfsend enote, with any number of auxiliary selfsend enotes, if one so chooses to add them. When performing balance recovery, we need to scan all enotes 1) whose primary view tag parts do not match but 2) are inside transactions containing at least one enote whose primary view tag DID match. Luckily, we only need to scan these enotes for auxiliary selfsend types, which means we can skip doing any ECDH exchange operations.
+For this reason, we introduce the distinction between exclusive and auxiliary selfsend enotes. Each transaction that one creates should have exactly one exclusive selfsend enote, with any number of auxiliary selfsend enotes, if one so chooses to add them. When performing balance recovery, we need to scan all enotes 1) whose primary view tags do not match but 2) are inside transactions containing at least one enote whose primary view tag DID match. Luckily, we only need to scan these enotes for auxiliary selfsend types, which means we can skip doing any ECDH exchange operations.
 
 \subsubsection{Enote summary}
 \label{subsubsec:jamtis-enote-construction-view-tag}
@@ -522,18 +522,18 @@ Jamtis balance recovery can be divided into two steps: view tag checks and enote
 \subsubsection{Primary view tag check and $D^d_{fa}$}
 \label{subsubsec:jamtis-balance-recovery-view-tag-primary}
 
-Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context}, a user who wants to see if they own the enote begins by checking its primary view tag part. This requires the user's $d_{fa}$.
+Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context}, a user who wants to see if they own the enote begins by checking its primary view tag. This requires the user's $d_{fa}$.
 
 \begin{enumerate}
     \item Compute the nominal key derivation: $D'^d_{fa} = d_{fa} * D_e$
 
-    \item Compute the nominal primary view tag part:
+    \item Compute the nominal primary view tag:
 
-    ${\tt primary\_view\_tag\_part'} = \mathcal{H}_{pvt}(D^d_{fa} || K^o)$
+    ${\tt primary\_view\_tag'} = \mathcal{H}_{pvt}(D^d_{fa} || K^o)$
     
-    \item Extract the ${\tt primary\_view\_tag\_part}$ from the ${\tt view\_tag}$
+    \item Extract the ${\tt primary\_view\_tag}$ from the ${\tt view\_tag}$
 
-    \item If ${\tt primary\_view\_tag\_part}' = {\tt primary\_view\_tag\_part}$ then jump to the sender-receiver secret $s^{sr}_1$ derivation (\ref{subsubsec:jamtis-balance-recovery-sr1}). If any other enotes within this transaction had matching primary view tag parts, then the only balance recovery path left to try is the auxiliary selfsend path. Move onto the auxiliary view tag check (\ref{subsubsec:jamtis-balance-recovery-aux-check}). Otherwise, if no enotes in the transaction had matching primary view tag parts, ${\tt ABORT}$.
+    \item If ${\tt primary\_view\_tag}' = {\tt primary\_view\_tag}$ then jump to the sender-receiver secret $s^{sr}_1$ derivation (\ref{subsubsec:jamtis-balance-recovery-sr1}). If any other enotes within this transaction had matching primary view tags, then the only balance recovery path left to try is the auxiliary selfsend path. Move onto the auxiliary view tag check (\ref{subsubsec:jamtis-balance-recovery-aux-check}). Otherwise, if no enotes in the transaction had matching primary view tags, ${\tt ABORT}$.
 \end{enumerate}
 
 \subsubsection{Auxiliary view tag check}
@@ -565,11 +565,11 @@ We the use the sender-receiver secret $s^{sr}_1$ to 1) decrypt the address tag a
 If you are on the auxiliary selfsend balance recovery path, then you skip the complementary view tag check. Otherwise, for normal and exclusive selfsend paths, checking the complementary view tag allows us to abort early most of the time, skipping the expensive $K^o$ recomputation.
 
 \begin{enumerate}
-    \item Compute the nominal complementary view tag part
-    \[{\tt complementary\_view\_tag\_part'} = \mathcal{H}_{cvt}(s^{sr}_1)\]
-    \item Extract ${\tt complementary\_view\_tag\_part}$ from ${\tt view\_tag}$
+    \item Compute the nominal complementary view tag
+    \[{\tt complementary\_view\_tag'} = \mathcal{H}_{cvt}(s^{sr}_1)\]
+    \item Extract ${\tt complementary\_view\_tag}$ from ${\tt view\_tag}$
     
-    \item If ${\tt complementary\_view\_tag\_part'} \neq {\tt complementary\_view\_tag\_part}$, then ${\tt ABORT}$
+    \item If ${\tt complementary\_view\_tag'} \neq {\tt complementary\_view\_tag}$, then ${\tt ABORT}$
 \end{enumerate}
 
 \subsubsection{Full enote recovery}
@@ -647,7 +647,7 @@ Now we define the balance recovery procedure.
 
     Also collect the key images of transactions that contributed enotes to that basic record set.
 
-    \item Perform normal enote scanning on those basic/auxiliary records, starting with checking the complementary/auxiliary view tag part. Then we recompute $D^d_{fa}$ and re-do the primary view tag check. After that, proceed normally.
+    \item Perform normal enote scanning on those basic/auxiliary records, starting with checking the complementary/auxiliary view tag. Then we recompute $D^d_{fa}$ and re-do the primary view tag check. After that, proceed normally.
 
     \item Mark as spent all enotes owned by the user (including cached and newly acquired enotes) whose key images can be found in the transactions that fed enotes to the basic record set. Flag the transactions that contain key image matches.
 
@@ -692,7 +692,7 @@ A user can set up a remote filter-assist wallet that creates basic records from 
 
     \item An filter-assist wallet only has to transmit basic records of enotes that pass primary view tag checks, auxiliary records of enotes in transactions which have at least one enote that passes the primary view tag check, and key images associated with those enotes to the user. This amounts to a substantial relative reduction in data that a user needs to access compared to the remote wallet, even if view tags are only 8 bits (a ~128:1 reduction).
 
-    \item The first step that a user needs to do to process a basic record is check the complementary view tag part.
+    \item The first step that a user needs to do to process a basic record is check the complementary view tag.
 
     \item The user will only look for selfsend enotes in transactions containing the key images of their owned enotes. Moreover, despite the selfsend path needing to decrypt the encrypted address tag before doing a hint check, doing so is very cheap since $s^{sr}_1$ for selfsends is derived from $k_{vb}$ instead of $D^d_{vr}$. Overall this means checking for selfsends has very low relative computation cost.
 \end{itemize}
