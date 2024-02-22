@@ -605,7 +605,7 @@ Now the user is prepared to recover the enote amount.\footnote{These steps are n
         \item \textbf{Normal scan}:
             \begin{enumerate}
                 \item Compute the address private key of $j'$: $d^{j'}_a = \mathcal{H}^n_{ap}(K_s || j' || s^{j'}_{gen})$
-                \item Compute the secret: $s'^{sr}_2 = \mathcal{H}_{sr2n}((1/(d^{j'}_a * d_{vr})) * K_e)$
+                \item Compute the secret: $s'^{sr}_2 = \mathcal{H}_{sr2n}((1/(d^{j'}_a * d_{vr})) * D_e)$
             \end{enumerate}
         \item \textbf{Selfsend scan}: $s'^{sr}_2 = \mathcal{H}_{sr2s[\tau]}(k_{vb} || s^{sr}_1)$
     \end{itemize}
@@ -702,11 +702,11 @@ Jamtis is designed to offer conditional forward secrecy against a DLP-solver. Th
 \subsubsection{Public address access}
 \label{subsubsec:jamtis-forward-secrecy-address-access}
 
-A DLP solver with a user's public Jamtis address can recover the user's find-received key and identify all normal enotes owned by that address and their amounts.
+A DLP solver with a user's public Jamtis address can recover the user's view-received key and identify all normal enotes owned by that address and their amounts.
 \begin{itemize}
-    \item The adversary can solve for $d_{vr}$ in $d_{vr} K^j_{base} = K^j_{vr}$ and use it to unwrap candidate onetime addresses to check if the unwrapped spend keys match the address's $K^j_s$.
+    \item The adversary can solve for $d_{vr}$ in $d_{vr} D^j_{base} = D^j_{vr}$ and use it to unwrap candidate onetime addresses to check if the unwrapped spend keys match the address's $D^j_s$.
 
-    \item The adversary can solve for $r$ in $r K^j_{base} = D_e$ to compute the key $r G$, which allows the $s^{sr}_2$ of normal enotes to be computed.
+    \item The adversary can solve for $r$ in $r D^j_{base} = D_e$ to compute the key $r G$, which allows the $s^{sr}_2$ of normal enotes to be computed.
 \end{itemize}
 
 If at least one of those normal enotes is spent, then the DLP solver can additionally compute all of the user's key images. More precisely, they can generate key image candidates derived from all on-chain key images, among which will be the real key images - if two normal enotes are spent then the candidate set collapses.
@@ -718,7 +718,7 @@ If at least one of those normal enotes is spent, then the DLP solver can additio
     However, if two enotes are spent out of the user's compromised enote set for a particular address, then the adversary will recover the same pair $k^j_x + k_{vb}$ and $k^j_u + k_m$ from both of those enotes, allowing the candidate set for that address to collapse.
 \end{itemize}
 
-A DLP solver cannot figure out anything about a user's selfsend owned enotes (aside from performing view tag checks if their filter-assist key is known). The DLP solver also cannot look at a set of addresses to learn anything about addresses not in that set.
+A DLP solver cannot figure out anything about a user's selfsend owned enotes (aside from performing primary view tag checks if their filter-assist key is known). The DLP solver also cannot look at a set of addresses to learn anything about addresses not in that set.
 
 \subsubsection{Generate-address secret access}
 \label{subsubsec:jamtis-forward-secrecy-generate-address-access}
