@@ -416,7 +416,7 @@ We bind to $K^o$ for robustness.\footnote{It is feasible, although unlikely, tha
 
 As a balance recovery optimization, we compute two MAC-like hashes of $D^d_{fa}$ and $s^{sr}_1$ called the `primary view tag' and `complementary view tag' \cite{reduce-scan-times-view-tag-research-issue-73} for normal and exclusive selfsend enotes (auxiliary selfsend enotes instead use an `auxiliary view tag'). These MAC-like hashes are spliced together into a fixed-size byte buffer called the `view tag', which is included in enotes. A person doing balance recovery can recompute the primary/complementary/auxiliary view tags for a given enote and check them against the stored aggregate view tag. If the computed sub-tags don't match against their bit ranges in the aggregate tag, then most of the other balance recovery steps, especially the most expensive steps, can be skipped.\footnote{Aggregate view tags only need to be 1 or 2 bytes to effectively amortize post-view-tag computations.}
 
-We discuss the rationale for this view tag design in Section \ref{subsubsec:jamtis-wallets-view-tag-distinction}. Note going forward, however, that the primary view tag depends on $d_{fa}$, while the complementary view tag depends on $d_{vr}$.
+We discuss the rationale for this view tag design in Section \ref{subsubsec:jamtis-wallets-remote-assisted}. Note going forward, however, that the primary view tag depends on $d_{fa}$, while the complementary view tag depends on $d_{vr}$.
 
 \textbf{Normal Enotes and Exclusive Selfsend Enotes}
 
@@ -676,28 +676,22 @@ Here we see the value of $d_{vr}$, which separates payment validators from the f
 
 A user can set up a remote filter-assist wallet that passes filtered enotes to their local view-balance wallet (or payment validator). There are several important details to highlight.
 \begin{itemize}
-    \item A filter-assist wallet has very limited information about the user's owned enotes. It can only perform primary tag checks on enotes, which merely filters down the set of enotes `possibly owned by the user'.
+    \item A filter-assist wallet has very limited information about the user's owned enotes. It can only perform primary view tag checks on enotes, which merely filters down the set of enotes possibly owned by the user. Note that the granularity of primary view tag checks is controlled by {\tt npbits}. If {\tt npbits} is small then the filter will catch many enotes, and vice versa.
 
-    \item A filter-assist wallet only has to transmit enotes that pass primary view tag checks and all other enotes in those enotes' transactions (since they may pass the auxiliary view tag check, which requires $k_{vb}$), and key images associated with those enotes to the user. This amounts to a substantial relative reduction in data that a user needs to access compared to the remote wallet, even if primary view tags are only 8 bits (a ~128:1 reduction).
+    Note further that even if a transaction contains multiple self-sends, the filter-assist wallet will only see a primary view tag match for one of them (unless another one randomly matches). This means transactions with multiple selfsends are indistinguishable from those without.
 
-    \item The first step that a user needs to do to process an enote received from a filter-assist wallet is check the auxiliary and complementary view tags. Complementary view tags require a Diffie-Hellman exchange to compute $D^d_{vr}$, which means normal enote scanning for the user has similar cost on a per-enote basis to the filter-assist wallet (per enote that passed a primary view tag check).
+    \item A filter-assist wallet only has to transmit enotes and key images from transactions with at least one primary view tag match to the user. Note that all enotes in a transaction with a primary view tag match must be sent due to the possibility of auxiliary view tag matches among the other enotes.
 
-    \item The user only needs to look for selfsend enotes in transactions containing the key images of their owned enotes. Overall this means checking for selfsends has very low relative computation cost.
+    This amounts to a substantial relative reduction in data that a user needs to access compared to the remote wallet, even if primary view tags are only 8 bits (a reduction of about 128:1 taking into account that most transactions have two enotes).
+
+    \item The first step that a user needs to do to process an enote received from a filter-assist wallet is check the auxiliary and complementary view tags.
+    
+    Complementary view tags require a Diffie-Hellman exchange to compute $D^d_{vr}$, which means enote scanning for the user has similar cost on a per-enote basis to the filter-assist wallet (per enote that passed a primary view tag check).
+
+    Auxiliary view tag checks only require a hash, making it relatively cheap to check for additional selfsends.
 \end{itemize}
 
 The result is highly constrained information access for the remote filter-assist wallet and speedy balance recovery for the user.
-
-\subsubsection{Primary/Complementary/Auxiliary Distinction}
-\label{subsubsec:jamtis-wallets-view-tag-distinction}
-
-The reason we have different types of view tags is to prevent the filter-assist tier from making educated guesses about which enotes are owned selfsend enotes, based on the number of primary view tag matches within a transaction. At a high level, this protection lets users who have offloaded their filter-assist tier to a third party to perform enote `churning' and `pocket change'-like features without additional loss of privacy.
-
-Let's say that ${\tt npbits} = 8$. This means that the primary view tag can take on $2^{\tt npbits} = 256$ unique values. Considering that probability of encountering any given primary view tag value for unrelated enotes is uniformly distributed, you would expect to get primary view tag matches once every $256$ enotes. If all of your outgoing transactions contain exactly one selfsend enote, meaning one view tag match, and the number of outgoing transactions is negligible compared to the total number of transactions that exist in the ledger, then the filter-assist tier will have little to no usable information to extract regarding which enotes are owned selfsend enotes.
-
-But what happens when the user constructs multiple selfsend enotes within the same transaction? As an extreme example, let's say that one wants to split up one enote worth 16 into 16 enotes worth 1 each (perhaps as a workaround to the 10-block-lock). To do this, the transaction author would create 16 selfsend enotes. The problem with this is that if all of those enotes have matching view tags, it is more or less probabilitically guaranteed from the perspective of anyone with knowledge of $d_{fa}$ that a the creator of these enotes is sending funds to this account. For any group of 16 enotes, the probability that all 16 enotes have a matching view tag (assuming again that ${\tt npbits}=8$) from a sender sending to an unrelated account is 
-$1 / ((2^{\tt npbits})^{16}) = 2^{-128}$, the same chance as randomly guessing someone's AES-128 private key on the first try! This would make for extremely strong heuristics against light wallet users' privacy.
-
-For this reason, we introduce the distinction between exclusive and auxiliary selfsend enotes. Each transaction that one creates should have exactly one exclusive selfsend enote, with any number of auxiliary selfsend enotes, if one so chooses to add them. When performing balance recovery, we need to scan all enotes 1) whose primary view tags do not match but 2) are inside transactions containing at least one enote whose primary view tag DID match. Luckily, we only need to scan these enotes for auxiliary selfsend types, which means we can skip doing any ECDH exchange operations.
 
 
 \subsection{Forward secrecy against DLP-solver}
