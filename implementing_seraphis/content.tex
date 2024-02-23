@@ -673,7 +673,7 @@ Here we see the value of $d_{vr}$, which separates payment validators from the f
 
 A user can set up a remote filter-assist wallet that passes filtered enotes to their local view-balance wallet (or payment validator). There are several important details to highlight.
 \begin{itemize}
-    \item A filter-assist wallet has very limited information about the user's owned enotes. It can only perform primary view tag checks on enotes, which merely filters down the set of enotes possibly owned by the user. Note that the granularity of primary view tag checks is controlled by {\tt npbits}. If {\tt npbits} is small then the filter will catch many enotes, and vice versa.
+    \item A filter-assist wallet has very limited information about the user's owned enotes. It can only perform primary view tag checks on enotes, which merely filters down the set of enotes possibly owned by the user. Note that the granularity of primary view tag checks is controlled by {\tt npbits}. If {\tt npbits} is small then the filter will catch many enotes, which provides a larger anonymity pool for users, but means that those wallets will have higher bandwidth and computational requirements. The converse is also true: when {\tt npbits} is large, then the filter won't catch as many enotes, which is worse for anonymity, but allows for lighter loads.
 
     Note further that even if a transaction contains multiple self-sends, the filter-assist wallet will only see a primary view tag match for one of them (unless another one randomly matches). This means transactions with multiple selfsends are indistinguishable from those without.
 
