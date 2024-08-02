@@ -516,24 +516,24 @@ Given an enote with associated enote ephemeral key $D_e$ and {\tt input\_context
     \item Compute the nominal filter-assist key derivation: $D'^d_{fa} = d_{fa} * D_e$
 
     \item Compute the nominal primary view tag: ${\tt primary\_view\_tag'} = \mathcal{H}_{pvt}(D^d_{fa} || K^o)$
-    
+
     \item Extract the ${\tt primary\_view\_tag}$ from the ${\tt view\_tag}$ based on the configured bit-length {\tt npbits}.
 
-    \item If ${\tt primary\_view\_tag}' == {\tt primary\_view\_tag}$ then set {\tt is\_aux = false}, otherwise perform an auxiliary view tag check:
+    \item If ${\tt primary\_view\_tag}' \neq {\tt primary\_view\_tag}$ then perform an auxiliary view tag check:
 
     \begin{enumerate}
         \item If all other enotes in the transaction also failed the primary view tag check then ${\tt ABORT}$.
 
         \item Compute the nominal auxiliary view tag: ${\tt view\_tag'} = \mathcal{H}_{avt}(k_{vb} || K^o)$
-        
-        \item If ${\tt view\_tag'} == {\tt view\_tag}$ then set {\tt is\_aux = true}, otherwise ${\tt ABORT}$.
+
+        \item If ${\tt view\_tag'} \neq {\tt view\_tag}$ then ${\tt ABORT}$.
     \end{enumerate}
 \end{enumerate}
 
 \subsubsection{Complementary view tag check and $s^{sr}_1$}
 \label{subsubsec:jamtis-balance-recovery-view-tag-complementary}
 
-We then compute the sender-receiver secret $s^{sr}_1$ (domain-separated by {\tt is\_aux}), and perform a complementary view tag check for enotes with {\tt is\_aux == false}.
+For enotes which passed the primary view tag check, we compute the sender-receiver secret $s^{sr}_1$, and perform a complementary view tag check. Note that we may have to try multiple different paths for $s^{sr}_1$ derivation, depending on whether the primary and auxiliary view tag checks passed. 
 
 \begin{itemize}
     \item \textbf{Normal scan}: This requires $d_{vr}$.
@@ -550,11 +550,10 @@ We then compute the sender-receiver secret $s^{sr}_1$ (domain-separated by {\tt 
             \end{enumerate}
             \item \textbf{Selfsend scan}: $s'^{sr}_1 = \mathcal{H}_{sr1s[{\tt is\_aux}]}(k_{vb} || D_e || {\tt input\_context})$
         \end{itemize}
-    \item If {\tt is\_aux == false} then perform a complementary view tag check:
+    \item Test the complementary view tag:
         \begin{enumerate}
             \item Compute the nominal complementary view tag: ${\tt complementary\_view\_tag'} = \mathcal{H}_{cvt}(s^{sr}_1)$
-            \item Extract the ${\tt complementary\_view\_tag}$ from the ${\tt view\_tag}$ based on the configured bit-length {\tt ncbits}.
-            
+            \item Extract the ${\tt complementary\_view\_tag}$ from the ${\tt view\_tag}$ based on the configured bit-length {\tt ncbits}.           
             \item If ${\tt complementary\_view\_tag'} \neq {\tt complementary\_view\_tag}$ then ${\tt ABORT}$.
         \end{enumerate}
 \end{enumerate}
@@ -659,7 +658,7 @@ The Jamtis key structure and balance recovery design lends itself to a well-defi
 
     \item \textbf{Generate-address} ($s_{ga}, K_s, D_{fa}, D_{vr}, D_{base}$): Generate any Jamtis address for arbitrary index $j$. Decipher the address index of any existing Jamtis address.
 
-    \item \textbf{Payment validator} ($d_{vr}, K_s$): In addition to the find-received and generate-address tier capabilities, the payment validator can perform balance recovery for normal enotes up to (but not including) the key image computation.
+    \item \textbf{Payment validator} ($d_{vr}, K_s$): In addition to the filter-assist and generate-address tier capabilities, the payment validator can perform balance recovery for normal enotes up to (but not including) the key image computation.
 
     \item \textbf{View-balance} ($k_{vb}, k_m U$): View all balance-related information including for selfsend enotes.
 
